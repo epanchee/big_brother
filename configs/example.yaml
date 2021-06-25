@@ -1,0 +1,19 @@
+- &item1
+  name: item1
+  path: "body > div > p:nth-child(3) > a"
+  primary: false
+  item_type: ""
+  related: []
+- &item2
+  name: item2
+  path: "body > div > p:nth-child(3) > a"
+  primary: false
+  item_type: ""
+  related: []
+- 
+  name: item3
+  path: "body > div > p:nth-child(3) > a"
+  primary: false
+  item_type: ""
+  related:
+    - *item1
