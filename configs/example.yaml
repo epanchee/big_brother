@@ -17,3 +17,4 @@
   item_type: ""
   related:
     - *item1
+    - *item2

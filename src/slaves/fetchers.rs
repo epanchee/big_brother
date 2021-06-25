@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use scraper::{ElementRef, Html, Selector};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub struct FetchItem {
     pub name: String,
     pub path: String,
