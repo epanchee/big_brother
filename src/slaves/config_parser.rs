@@ -34,8 +34,6 @@ mod tests {
 
         let mut fetch_items = parse_yaml("configs/example.yaml");
         fetch_items.sort();
-        vec![item1, item2, item3].iter().zip(fetch_items).for_each(
-            move |(ok, test)| assert_eq!(*ok, test)
-        );
+        assert_eq!(vec![item1, item2, item3], fetch_items);
     }
 }
