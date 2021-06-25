@@ -1,76 +1,74 @@
-pub mod fetchers {
-    use anyhow::{anyhow, Result};
-    use scraper::{ElementRef, Html, Selector};
-    use serde::{Serialize, Deserialize};
+use anyhow::{anyhow, Result};
+use scraper::{ElementRef, Html, Selector};
+use serde::{Deserialize, Serialize};
 
-    #[derive(Debug, Serialize, Deserialize, Clone)]
-    pub struct FetchItem {
-        pub name: String,
-        pub path: String,
-        pub primary: bool,
-        pub item_type: String,
-        pub related: Vec<Box<FetchItem>>,
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FetchItem {
+    pub name: String,
+    pub path: String,
+    pub primary: bool,
+    pub item_type: String,
+    pub related: Vec<Box<FetchItem>>,
+}
+
+impl FetchItem {
+    fn seek(&self, data: ElementRef) -> String {
+        data.inner_html()
     }
 
-    impl FetchItem {
-        fn seek(&self, data: ElementRef) -> String {
-            data.inner_html()
-        }
+    fn iter(&self) -> Box<dyn Iterator<Item = &FetchItem> + '_> {
+        Box::new(std::iter::once(self).chain(self.related.iter().flat_map(|x| x.iter())))
+    }
+}
 
-        fn iter(&self) -> Box<dyn Iterator<Item = &FetchItem> + '_> {
-            Box::new(std::iter::once(self).chain(self.related.iter().flat_map(|x| x.iter())))
-        }
+pub struct BaseFetcher {
+    pub items: Vec<FetchItem>,
+    pub url: String,
+    pub tree: Html,
+    pub fetched: Vec<Option<String>>,
+}
+
+impl BaseFetcher {
+    async fn get_from_remote(&self) -> Result<Html, Box<dyn std::error::Error>> {
+        let resp_text = reqwest::get(&self.url).await?.text().await?;
+        Ok(Html::parse_document(&resp_text[..]))
     }
 
-    pub struct BaseFetcher {
-        pub items: Vec<FetchItem>,
-        pub url: String,
-        pub tree: Html,
-        pub fetched: Vec<Option<String>>,
+    fn select(&self, selector: &String) -> Result<ElementRef> {
+        let selector = Selector::parse(&selector[..])
+            .map_err(|x| anyhow!("Selector parsing errored {:?}", x))?;
+        Ok(self.tree.select(&selector).next().unwrap())
     }
 
-    impl BaseFetcher {
-        async fn get_from_remote(&self) -> Result<Html, Box<dyn std::error::Error>> {
-            let resp_text = reqwest::get(&self.url).await?.text().await?;
-            Ok(Html::parse_document(&resp_text[..]))
-        }
-
-        fn select(&self, selector: &String) -> Result<ElementRef> {
-            let selector = Selector::parse(&selector[..])
-                .map_err(|x| anyhow!("Selector parsing errored {:?}", x))?;
-            Ok(self.tree.select(&selector).next().unwrap())
-        }
-
-        pub async fn fetch(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-            self.tree = self.get_from_remote().await?;
-            for root_item in self.items.iter() {
-                for item in root_item.iter() {
-                    self.fetched.push({
-                        if let Ok(data) = self.select(&item.path) {
-                            Some(item.seek(data))
-                        } else {
-                            None
-                        }
-                    })
-                }
+    pub async fn fetch(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.tree = self.get_from_remote().await?;
+        for root_item in self.items.iter() {
+            for item in root_item.iter() {
+                self.fetched.push({
+                    if let Ok(data) = self.select(&item.path) {
+                        Some(item.seek(data))
+                    } else {
+                        None
+                    }
+                })
             }
-            Ok(())
         }
+        Ok(())
     }
+}
 
-    #[tokio::main]
-    pub async fn main() {
-        let resp_text = reqwest::get("http://example.com/")
-            .await
-            .unwrap()
-            .text()
-            .await
-            .unwrap();
-        let tree = Html::parse_document(&resp_text[..]);
-        let selector = Selector::parse("body > div > p:nth-child(3) > a").unwrap();
-        let selected_text = tree.select(&selector).take(1).collect::<Vec<_>>()[0].inner_html();
-        println!("{:#?}", selected_text);
-    }
+#[tokio::main]
+pub async fn main() {
+    let resp_text = reqwest::get("http://example.com/")
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    let tree = Html::parse_document(&resp_text[..]);
+    let selector = Selector::parse("body > div > p:nth-child(3) > a").unwrap();
+    let selected_text = tree.select(&selector).take(1).collect::<Vec<_>>()[0].inner_html();
+    println!("{:#?}", selected_text);
 }
 
 #[cfg(test)]
@@ -79,7 +77,7 @@ mod tests {
 
     use scraper::{Html, Selector};
 
-    use crate::slaves::fetchers::fetchers::{BaseFetcher, FetchItem};
+    use crate::slaves::fetchers::{BaseFetcher, FetchItem};
 
     #[tokio::test]
     async fn reqwest_works() {

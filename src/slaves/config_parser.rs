@@ -1,18 +1,15 @@
-pub mod config_parser {
+use std::fs;
 
-    use std::fs;
+use crate::slaves::fetchers::FetchItem;
 
-    use crate::slaves::fetchers::fetchers::FetchItem;
-
-    pub fn parse_yaml(config_file: &str) -> Vec<FetchItem> {
-        let content = fs::read_to_string(config_file).unwrap();
-        serde_yaml::from_str(&content[..]).unwrap()
-    }
+pub fn parse_yaml(config_file: &str) -> Vec<FetchItem> {
+    let content = fs::read_to_string(config_file).unwrap();
+    serde_yaml::from_str(&content[..]).unwrap()
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::slaves::{config_parser::config_parser::parse_yaml, fetchers::fetchers::FetchItem};
+    use crate::slaves::{config_parser::parse_yaml, fetchers::FetchItem};
 
     #[test]
     fn test_parse_yaml() {
