@@ -1,4 +1,7 @@
-use std::{fs, path::Path};
+use std::{
+    fs::{self},
+    path::Path,
+};
 
 use anyhow::{anyhow, Result};
 
@@ -11,26 +14,33 @@ pub fn parse_yaml(config_file: &str) -> Config {
     serde_yaml::from_str(&content[..]).unwrap()
 }
 
-pub fn parse_config_dir(dir_str: &str) -> Result<Vec<Config>> {
+pub fn parse_config_dir(dir_str: &str) -> Vec<Config> {
     let dir = Path::new(dir_str);
     let mut configs: Vec<Config> = vec![];
-    if dir.is_dir() {
-        for entry in fs::read_dir(dir)? {
+    for entry in fs::read_dir(dir).unwrap() {
+        let result = || -> Result<Config> {
             let path = entry?.path();
-            let ext = path
-                .extension()
-                .ok_or(anyhow!("Path to str conversion error"))?;
+            let ext = path.extension().ok_or(anyhow!("Path has no extension"))?;
             if ext == "yaml" {
-                configs.push(parse_yaml(
+                Ok(parse_yaml(
                     path.to_str()
                         .ok_or(anyhow!("Path to str conversion error"))?,
-                ));
+                ))
+            } else {
+                Err(anyhow!("I can only parse .yaml files"))
             }
+        }();
+
+        if let Ok(config) = result {
+            configs.push(config);
+        } else {
+            println!(
+                "Error happened with entry {:#?}\nDetails: {:?}",
+                entry, result
+            )
         }
-    } else {
-        panic!("{} is not a directory!", dir_str)
     }
-    Ok(configs)
+    configs
 }
 
 #[cfg(test)]
