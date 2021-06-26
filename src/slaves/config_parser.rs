@@ -116,7 +116,7 @@ mod tests {
         let config1 = vec![item1, item2, item3];
         let config2 = vec![item_x, item_y, item_z];
 
-        let mut configs = parse_config_dir("configs").unwrap();
+        let mut configs = parse_config_dir("configs");
         configs.sort();
 
         assert_eq!(vec![config2, config1], configs);
