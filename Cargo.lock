@@ -25,7 +25,6 @@ name = "big_brother"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "cssparser 0.28.1",
  "openssl",
  "openssl-sys",
  "reqwest",

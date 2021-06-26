@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Result};
 use scraper::{ElementRef, Html, Selector};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
+#[derive(Debug, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub struct FetchItem {
     pub name: String,
     pub path: String,
@@ -57,20 +57,6 @@ impl BaseFetcher {
     }
 }
 
-#[tokio::main]
-pub async fn main() {
-    let resp_text = reqwest::get("http://example.com/")
-        .await
-        .unwrap()
-        .text()
-        .await
-        .unwrap();
-    let tree = Html::parse_document(&resp_text[..]);
-    let selector = Selector::parse("body > div > p:nth-child(3) > a").unwrap();
-    let selected_text = tree.select(&selector).take(1).collect::<Vec<_>>()[0].inner_html();
-    println!("{:#?}", selected_text);
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -121,7 +107,7 @@ mod tests {
             fetched: vec![],
         };
 
-        fetcher.fetch().await;
+        fetcher.fetch().await.expect("Fetch failed");
 
         assert_eq!(fetcher.fetched[0].as_ref().unwrap(), "More information...");
     }
