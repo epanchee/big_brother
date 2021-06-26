@@ -1,0 +1,20 @@
+- &x
+  name: entity_x
+  path: "body > div > p:nth-child(3) > a"
+  primary: false
+  item_type: ""
+  related: []
+- &y
+  name: entity_y
+  path: "body > div > p:nth-child(3) > a"
+  primary: false
+  item_type: ""
+  related:
+    - *x
+- 
+  name: entity_z
+  path: "body > div > p:nth-child(3) > a"
+  primary: true
+  item_type: ""
+  related:
+    - *y
