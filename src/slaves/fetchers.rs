@@ -26,8 +26,8 @@ impl FetchItem {
 pub struct BaseFetcher {
     pub items: Config,
     pub url: String,
-    pub tree: Html,
-    pub fetched: Vec<Option<String>>,
+    tree: Html,
+    fetched: Vec<Option<String>>,
 }
 
 impl BaseFetcher {
