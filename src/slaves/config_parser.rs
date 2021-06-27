@@ -70,7 +70,7 @@ mod tests {
 
         let item3 = FetchItem {
             name: "item3".to_string(),
-            related: vec![Box::new(item1.clone()), Box::new(item2.clone())],
+            related: vec![item1.clone(), item2.clone()],
             ..item1.clone()
         };
 
@@ -94,7 +94,7 @@ mod tests {
         };
         let item3 = FetchItem {
             name: "item3".to_string(),
-            related: vec![Box::new(item1.clone()), Box::new(item2.clone())],
+            related: vec![item1.clone(), item2.clone()],
             ..item1.clone()
         };
         let item_x = FetchItem {
@@ -106,12 +106,12 @@ mod tests {
         };
         let item_y = FetchItem {
             name: "entity_y".to_string(),
-            related: vec![Box::new(item_x.clone())],
+            related: vec![item_x.clone()],
             ..item1.clone()
         };
         let item_z = FetchItem {
             name: "entity_z".to_string(),
-            related: vec![Box::new(item_y.clone())],
+            related: vec![item_y.clone()],
             primary: true,
             ..item1.clone()
         };

@@ -8,7 +8,7 @@ pub struct FetchItem {
     pub path: String,
     pub primary: bool,
     pub item_type: String,
-    pub related: Vec<Box<FetchItem>>,
+    pub related: Vec<FetchItem>,
 }
 
 impl FetchItem {
