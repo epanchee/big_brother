@@ -3,7 +3,7 @@ use std::{
     path::Path,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 
 use crate::slaves::fetchers::FetchItem;
 
@@ -17,10 +17,14 @@ pub fn parse_yaml(config_file: &str) -> Config {
 pub fn parse_config_dir(dir_str: &str) -> Vec<Config> {
     let dir = Path::new(dir_str);
     let mut configs: Vec<Config> = vec![];
-    for entry in fs::read_dir(dir).unwrap() {
+    let files = fs::read_dir(dir).unwrap();
+    for dir_entry in files {
         let result = || -> Result<Config> {
-            let path = entry?.path();
-            let ext = path.extension().ok_or(anyhow!("Path has no extension"))?;
+            let path = dir_entry?.path();
+            let ext = path
+                .extension()
+                .ok_or(anyhow!("Path has no extension"))
+                .with_context(|| format!("Error occured with {:?}", path))?;
             if ext == "yaml" {
                 Ok(parse_yaml(
                     path.to_str()
@@ -34,10 +38,7 @@ pub fn parse_config_dir(dir_str: &str) -> Vec<Config> {
         if let Ok(config) = result {
             configs.push(config);
         } else {
-            println!(
-                "Error happened with entry {:#?}\nDetails: {:?}",
-                entry, result
-            )
+            println!("{:?}", result);
         }
     }
     configs
