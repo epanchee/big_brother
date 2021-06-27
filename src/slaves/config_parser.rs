@@ -19,21 +19,21 @@ pub fn parse_config_dir(dir_str: &str) -> Vec<Config> {
     let mut configs: Vec<Config> = vec![];
     let files = fs::read_dir(dir).unwrap();
     for dir_entry in files {
-        let result = || -> Result<Config> {
-            let path = dir_entry?.path();
-            let ext = path
-                .extension()
-                .ok_or(anyhow!("Path has no extension"))
-                .with_context(|| format!("Error occured with {:?}", path))?;
-            if ext == "yaml" {
-                Ok(parse_yaml(
-                    path.to_str()
-                        .ok_or(anyhow!("Path to str conversion error"))?,
-                ))
-            } else {
-                Err(anyhow!("I can only parse .yaml files"))
-            }
-        }();
+        let result = dir_entry.map_err(From::from).and_then(|dir_entry| {
+            let path = dir_entry.path();
+            let parse_file = || -> Result<Config> {
+                let ext = path.extension().ok_or(anyhow!("Path has no extension"))?;
+                if ext == "yaml" {
+                    Ok(parse_yaml(
+                        path.to_str()
+                            .ok_or(anyhow!("Path to str conversion error"))?,
+                    ))
+                } else {
+                    Err(anyhow!("I can only parse .yaml files"))
+                }
+            };
+            parse_file().with_context(|| format!("Error occured with {:?}", path))
+        });
 
         if let Ok(config) = result {
             configs.push(config);
