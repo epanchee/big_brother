@@ -5,9 +5,7 @@ use std::{
 
 use anyhow::{anyhow, Context, Result};
 
-use crate::slaves::fetchers::FetchItem;
-
-type Config = Vec<FetchItem>;
+use crate::fetchers::Config;
 
 pub fn parse_yaml(config_file: &str) -> Config {
     let content = fs::read_to_string(config_file).unwrap();

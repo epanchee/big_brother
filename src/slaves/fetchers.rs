@@ -2,6 +2,8 @@ use anyhow::{anyhow, Result};
 use scraper::{ElementRef, Html, Selector};
 use serde::Deserialize;
 
+pub type Config = Vec<FetchItem>;
+
 #[derive(Debug, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub struct FetchItem {
     pub name: String,
@@ -22,7 +24,7 @@ impl FetchItem {
 }
 
 pub struct BaseFetcher {
-    pub items: Vec<FetchItem>,
+    pub items: Config,
     pub url: String,
     pub tree: Html,
     pub fetched: Vec<Option<String>>,
