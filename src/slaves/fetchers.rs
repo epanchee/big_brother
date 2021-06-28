@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use anyhow::{anyhow, Result};
 use scraper::{ElementRef, Html, Selector};
 use serde::Deserialize;
@@ -23,6 +25,12 @@ impl FetchItem {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct FoundItem<T> {
+    fetch_item: FetchItem,
+    pub content: T,
+}
+
 #[derive(Deserialize, Debug, PartialEq, PartialOrd, Eq, Ord)]
 pub struct BaseFetcher {
     pub items: Config,
@@ -43,14 +51,17 @@ impl BaseFetcher {
             .ok_or_else(|| anyhow!("Select failed"))
     }
 
-    pub async fn fetch(&self) -> Result<Vec<Option<String>>, Box<dyn std::error::Error>> {
+    pub async fn fetch(&self) -> Result<Vec<Option<FoundItem<String>>>, Box<dyn std::error::Error>> {
         let tree = self.get_from_remote().await?;
         let mut fetched = vec![];
         for root_item in self.items.iter() {
             for item in root_item.iter() {
                 fetched.push({
                     if let Ok(data) = Self::select(&item.path, &tree) {
-                        Some(item.seek(data))
+                        Some(FoundItem {
+                            fetch_item: item.clone(),
+                            content: item.seek(data),
+                        })
                     } else {
                         None
                     }
@@ -58,6 +69,12 @@ impl BaseFetcher {
             }
         }
         Ok(fetched)
+    }
+}
+
+impl Display for BaseFetcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BaseFetcher: url={}", self.url)
     }
 }
 
@@ -111,6 +128,6 @@ mod tests {
 
         let fetched = fetcher.fetch().await.expect("Fetch failed");
 
-        assert_eq!(fetched[0].as_ref().unwrap(), "More information...");
+        assert_eq!(fetched[0].as_ref().unwrap().content, "More information...");
     }
 }
