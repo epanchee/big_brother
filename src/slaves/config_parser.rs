@@ -5,29 +5,29 @@ use std::{
 
 use anyhow::{anyhow, Context, Result};
 
-use crate::fetchers::Config;
+use super::fetchers::BaseFetcher;
 
-pub fn parse_yaml(config_file: &str) -> Config {
+pub fn parse_yaml(config_file: &str) -> Result<BaseFetcher> {
     let content = fs::read_to_string(config_file).unwrap();
-    serde_yaml::from_str(&content[..]).unwrap()
+    serde_yaml::from_str(&content[..]).map_err(|_| anyhow!("Failed to parse yaml content"))
 }
 
-pub fn parse_config_dir(dir_str: &str) -> Vec<Config> {
+pub fn parse_config_dir(dir_str: &str) -> Vec<BaseFetcher> {
     let dir = Path::new(dir_str);
-    let mut configs: Vec<Config> = vec![];
+    let mut configs: Vec<BaseFetcher> = vec![];
     let files = fs::read_dir(dir).unwrap();
     for dir_entry in files {
         let result = dir_entry.map_err(From::from).and_then(|dir_entry| {
             let path = dir_entry.path();
-            let parse_file = || -> Result<Config> {
+            let parse_file = || -> Result<BaseFetcher> {
                 let ext = path
                     .extension()
                     .ok_or_else(|| anyhow!("Path has no extension"))?;
                 if ext == "yaml" {
-                    Ok(parse_yaml(
+                    parse_yaml(
                         path.to_str()
                             .ok_or_else(|| anyhow!("Path to str conversion error"))?,
-                    ))
+                    )
                 } else {
                     Err(anyhow!("I can only parse .yaml files"))
                 }
@@ -48,7 +48,7 @@ pub fn parse_config_dir(dir_str: &str) -> Vec<Config> {
 mod tests {
     use crate::slaves::{
         config_parser::{parse_config_dir, parse_yaml},
-        fetchers::FetchItem,
+        fetchers::{BaseFetcher, FetchItem, HtmlTree},
     };
 
     #[test]
@@ -72,9 +72,16 @@ mod tests {
             ..item1.clone()
         };
 
-        let mut fetch_items = parse_yaml("configs/example.yaml");
-        fetch_items.sort();
-        assert_eq!(vec![item1, item2, item3], fetch_items);
+        let config = BaseFetcher {
+            items: vec![item1, item2, item3],
+            url: "http://example.com".to_string(),
+            tree: HtmlTree::default(),
+            fetched: vec![],
+        };
+
+        let mut fetch_items = parse_yaml("configs/example.yaml").unwrap();
+        fetch_items.items.sort();
+        assert_eq!(config, fetch_items);
     }
 
     #[test]
@@ -114,8 +121,19 @@ mod tests {
             ..item1.clone()
         };
 
-        let config1 = vec![item1, item2, item3];
-        let config2 = vec![item_x, item_y, item_z];
+        let config1 = BaseFetcher {
+            items: vec![item1, item2, item3],
+            url: "http://example.com".to_string(),
+            tree: HtmlTree::default(),
+            fetched: vec![],
+        };
+
+        let config2 = BaseFetcher {
+            items: vec![item_x, item_y, item_z],
+            url: "http://another-example.com".to_string(),
+            tree: HtmlTree::default(),
+            fetched: vec![],
+        };
 
         let mut configs = parse_config_dir("configs");
         configs.sort();
@@ -125,5 +143,36 @@ mod tests {
         // detailed test
         // configs[1].iter().zip(&config1).for_each(|(i1, i2)| assert_eq!(i1, i2));
         // configs[0].iter().zip(&config2).for_each(|(i1, i2)| assert_eq!(i1, i2));
+    }
+
+    #[test]
+    fn test_parse_base_fetcher() {
+        let item1 = FetchItem {
+            name: "item1".to_string(),
+            path: "body > div > p:nth-child(3) > a".to_string(),
+            primary: false,
+            item_type: "".to_string(),
+            related: vec![],
+        };
+
+        let item2 = FetchItem {
+            name: "item2".to_string(),
+            ..item1.clone()
+        };
+
+        let item3 = FetchItem {
+            name: "item3".to_string(),
+            related: vec![item1.clone(), item2.clone()],
+            ..item1.clone()
+        };
+
+        let fetcher = BaseFetcher {
+            items: vec![item1, item2, item3],
+            url: "http://example.com".to_string(),
+            tree: HtmlTree::default(),
+            fetched: vec![],
+        };
+
+        println!("{}", serde_yaml::to_string(&fetcher).unwrap());
     }
 }

@@ -1,10 +1,10 @@
 use anyhow::{anyhow, Result};
 use scraper::{ElementRef, Html, Selector};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub type Config = Vec<FetchItem>;
 
-#[derive(Debug, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub struct FetchItem {
     pub name: String,
     pub path: String,
@@ -23,7 +23,8 @@ impl FetchItem {
     }
 }
 
-struct HtmlTree {
+#[derive(Debug, PartialEq, Eq)]
+pub struct HtmlTree {
     pub inner_tree: Html,
 }
 
@@ -35,15 +36,26 @@ impl Default for HtmlTree {
     }
 }
 
-#[derive(Deserialize)]
+impl PartialOrd for HtmlTree {
+    fn partial_cmp(&self, _: &Self) -> Option<std::cmp::Ordering> {
+        Some(std::cmp::Ordering::Equal)
+    }
+}
+
+impl Ord for HtmlTree {
+    fn cmp(&self, _: &Self) -> std::cmp::Ordering {
+        std::cmp::Ordering::Equal
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, PartialEq, PartialOrd, Eq, Ord)]
 pub struct BaseFetcher {
     pub items: Config,
     pub url: String,
     #[serde(skip)]
-    tree: HtmlTree,
+    pub tree: HtmlTree,
     #[serde(skip)]
-    #[serde(default)]
-    fetched: Vec<Option<String>>,
+    pub fetched: Vec<Option<String>>,
 }
 
 impl BaseFetcher {
