@@ -1,6 +1,4 @@
-use std::{sync::Arc, time::Duration};
-
-use tokio::sync::Mutex;
+use std::time::Duration;
 
 use super::{
     config_parser::parse_config_dir,
@@ -30,22 +28,25 @@ impl FetchDaemon {
     async fn fetch_data(configs: Vec<BaseFetcher>) -> Vec<Vec<FoundItem>> {
         let mut pendind_tasks = vec![];
         for config in configs {
-            pendind_tasks.push(tokio::spawn(async move { config.fetch().await }));
+            pendind_tasks.push(tokio::spawn(async move {
+                if let Ok(data) = config.fetch().await {
+                    Some(data)
+                } else {
+                    println!("Couldn't fetch any data in {}", config);
+                    None
+                }
+            }));
         }
         let mut fetched_confs = vec![];
 
-        for task in pendind_tasks {
-            let fetched = task
+        for pending_task in pendind_tasks {
+            let fetched = pending_task
                 .await
-                .map_err(From::from)
-                .and_then(|x| x)
-                .map(|list| list.into_iter().flatten().collect::<Vec<_>>());
+                .map(|list| list.into_iter().flatten().flatten().collect::<Vec<_>>());
 
-            if let Ok(fetched) = fetched {
-                fetched_confs.push(fetched)
-            } else {
-                println!("Couldn't fetch any data in {}", "?")
-            }
+            if let Ok(data) = fetched {
+                fetched_confs.push(data)
+            };
         }
 
         fetched_confs
@@ -57,7 +58,7 @@ impl FetchDaemon {
             let fetched = Self::fetch_data(configs).await;
             println!("{:?}", fetched);
             println!("Going to sleep for {} secs...", self.interval.as_secs());
-            tokio::time::sleep(self.interval);
+            tokio::time::sleep(self.interval).await;
         }
     }
 }
