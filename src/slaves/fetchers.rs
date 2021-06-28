@@ -23,10 +23,26 @@ impl FetchItem {
     }
 }
 
+struct HtmlTree {
+    pub inner_tree: Html,
+}
+
+impl Default for HtmlTree {
+    fn default() -> Self {
+        HtmlTree {
+            inner_tree: Html::new_document(),
+        }
+    }
+}
+
+#[derive(Deserialize)]
 pub struct BaseFetcher {
     pub items: Config,
     pub url: String,
-    tree: Html,
+    #[serde(skip)]
+    tree: HtmlTree,
+    #[serde(skip)]
+    #[serde(default)]
     fetched: Vec<Option<String>>,
 }
 
@@ -36,14 +52,18 @@ impl BaseFetcher {
         Ok(Html::parse_document(&resp_text[..]))
     }
 
-    fn select(&self, selector: &String) -> Result<ElementRef> {
-        let selector = Selector::parse(&selector[..])
-            .map_err(|x| anyhow!("Selector parsing errored {:?}", x))?;
-        Ok(self.tree.select(&selector).next().unwrap())
+    fn select(&self, selector: &str) -> Result<ElementRef> {
+        let selector =
+            Selector::parse(selector).map_err(|x| anyhow!("Selector parsing errored {:?}", x))?;
+        self.tree
+            .inner_tree
+            .select(&selector)
+            .next()
+            .ok_or_else(|| anyhow!("Select failed"))
     }
 
     pub async fn fetch(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.tree = self.get_from_remote().await?;
+        self.tree.inner_tree = self.get_from_remote().await?;
         for root_item in self.items.iter() {
             for item in root_item.iter() {
                 self.fetched.push({
@@ -65,7 +85,7 @@ mod tests {
 
     use scraper::{Html, Selector};
 
-    use crate::slaves::fetchers::{BaseFetcher, FetchItem};
+    use crate::slaves::fetchers::{BaseFetcher, FetchItem, HtmlTree};
 
     #[tokio::test]
     async fn reqwest_works() {
@@ -105,7 +125,7 @@ mod tests {
         let mut fetcher = BaseFetcher {
             items: vec![item1],
             url: "http://example.com/".to_string(),
-            tree: Html::new_document(),
+            tree: HtmlTree::default(),
             fetched: vec![],
         };
 
