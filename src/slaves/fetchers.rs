@@ -25,9 +25,9 @@ impl FetchItem {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
 pub struct FoundItem<T> {
-    fetch_item: FetchItem,
+    pub fetch_item: FetchItem,
     pub content: T,
 }
 
