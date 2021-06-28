@@ -43,13 +43,13 @@ impl BaseFetcher {
             .ok_or_else(|| anyhow!("Select failed"))
     }
 
-    pub async fn fetch(&mut self) -> Result<Vec<Option<String>>, Box<dyn std::error::Error>> {
+    pub async fn fetch(&self) -> Result<Vec<Option<String>>, Box<dyn std::error::Error>> {
         let tree = self.get_from_remote().await?;
         let mut fetched = vec![];
         for root_item in self.items.iter() {
             for item in root_item.iter() {
                 fetched.push({
-                    if let Ok(data) = BaseFetcher::select(&item.path, &tree) {
+                    if let Ok(data) = Self::select(&item.path, &tree) {
                         Some(item.seek(data))
                     } else {
                         None
@@ -104,7 +104,7 @@ mod tests {
             related: vec![],
         };
 
-        let mut fetcher = BaseFetcher {
+        let fetcher = BaseFetcher {
             items: vec![item1],
             url: "http://example.com/".to_string(),
         };
