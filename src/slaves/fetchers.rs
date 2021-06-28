@@ -26,7 +26,7 @@ impl FetchItem {
 }
 
 #[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
-pub struct FoundItem<T> {
+pub struct FoundItem<T = String> {
     pub fetch_item: FetchItem,
     pub content: T,
 }
@@ -38,7 +38,7 @@ pub struct BaseFetcher {
 }
 
 impl BaseFetcher {
-    async fn get_from_remote(&self) -> Result<Html, Box<dyn std::error::Error>> {
+    async fn get_from_remote(&self) -> Result<Html> {
         let resp_text = reqwest::get(&self.url).await?.text().await?;
         Ok(Html::parse_document(&resp_text[..]))
     }
@@ -51,7 +51,7 @@ impl BaseFetcher {
             .ok_or_else(|| anyhow!("Select failed"))
     }
 
-    pub async fn fetch(&self) -> Result<Vec<Option<FoundItem<String>>>, Box<dyn std::error::Error>> {
+    pub async fn fetch(&self) -> Result<Vec<Option<FoundItem>>> {
         let tree = self.get_from_remote().await?;
         let mut fetched = vec![];
         for root_item in self.items.iter() {

@@ -1,4 +1,4 @@
-use std::{sync::Arc, thread, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use tokio::sync::Mutex;
 
@@ -27,48 +27,43 @@ impl FetchDaemon {
         }
     }
 
-    async fn fetch_data(configs: Arc<Mutex<Vec<BaseFetcher>>>) -> Vec<Vec<FoundItem<String>>> {
+    async fn fetch_data(configs: Vec<BaseFetcher>) -> Vec<Vec<FoundItem>> {
+        let mut pendind_tasks = vec![];
+        for config in configs {
+            pendind_tasks.push(tokio::spawn(async move { config.fetch().await }));
+        }
         let mut fetched_confs = vec![];
-        for config in configs.try_lock().unwrap().iter() {
-            let fetched = config
-                .fetch()
+
+        for task in pendind_tasks {
+            let fetched = task
                 .await
-                .map(|list| list.iter().cloned().flatten().collect::<Vec<_>>());
+                .map_err(From::from)
+                .and_then(|x| x)
+                .map(|list| list.into_iter().flatten().collect::<Vec<_>>());
+
             if let Ok(fetched) = fetched {
                 fetched_confs.push(fetched)
             } else {
-                println!("Couldn't fetch any data in {}", config)
+                println!("Couldn't fetch any data in {}", "?")
             }
         }
+
         fetched_confs
     }
 
-    #[tokio::main]
     pub async fn start(self) {
-        let configs = parse_config_dir(&self.conf_path[..]);
-        let configs = Arc::new(Mutex::new(configs));
         loop {
-            let configs = configs.clone();
-
-            tokio::spawn(async move {
-                let fetched = Self::fetch_data(configs).await;
-                println!("{:?}", fetched);
-            })
-            .await
-            .expect("Spawned async context failed");
-
+            let configs = parse_config_dir(&self.conf_path[..]);
+            let fetched = Self::fetch_data(configs).await;
+            println!("{:?}", fetched);
             println!("Going to sleep for {} secs...", self.interval.as_secs());
-            thread::sleep(self.interval)
+            tokio::time::sleep(self.interval);
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    use tokio::sync::Mutex;
-
     use crate::slaves::{
         config_parser::parse_config_dir,
         fetchers::{BaseFetcher, FetchItem, FoundItem},
@@ -130,7 +125,6 @@ mod tests {
         let config2 = gen_config2();
 
         let configs = parse_config_dir("configs");
-        let configs = Arc::new(Mutex::new(configs));
         let mut fetched = FetchDaemon::fetch_data(configs).await;
         fetched.sort();
 
