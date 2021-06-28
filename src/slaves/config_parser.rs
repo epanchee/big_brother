@@ -48,7 +48,7 @@ pub fn parse_config_dir(dir_str: &str) -> Vec<BaseFetcher> {
 mod tests {
     use crate::slaves::{
         config_parser::{parse_config_dir, parse_yaml},
-        fetchers::{BaseFetcher, FetchItem, HtmlTree},
+        fetchers::{BaseFetcher, FetchItem},
     };
 
     #[test]
@@ -75,8 +75,6 @@ mod tests {
         let config = BaseFetcher {
             items: vec![item1, item2, item3],
             url: "http://example.com".to_string(),
-            tree: HtmlTree::default(),
-            fetched: vec![],
         };
 
         let mut fetch_items = parse_yaml("configs/example.yaml").unwrap();
@@ -124,15 +122,11 @@ mod tests {
         let config1 = BaseFetcher {
             items: vec![item1, item2, item3],
             url: "http://example.com".to_string(),
-            tree: HtmlTree::default(),
-            fetched: vec![],
         };
 
         let config2 = BaseFetcher {
             items: vec![item_x, item_y, item_z],
             url: "http://another-example.com".to_string(),
-            tree: HtmlTree::default(),
-            fetched: vec![],
         };
 
         let mut configs = parse_config_dir("configs");
@@ -143,36 +137,5 @@ mod tests {
         // detailed test
         // configs[1].iter().zip(&config1).for_each(|(i1, i2)| assert_eq!(i1, i2));
         // configs[0].iter().zip(&config2).for_each(|(i1, i2)| assert_eq!(i1, i2));
-    }
-
-    #[test]
-    fn test_parse_base_fetcher() {
-        let item1 = FetchItem {
-            name: "item1".to_string(),
-            path: "body > div > p:nth-child(3) > a".to_string(),
-            primary: false,
-            item_type: "".to_string(),
-            related: vec![],
-        };
-
-        let item2 = FetchItem {
-            name: "item2".to_string(),
-            ..item1.clone()
-        };
-
-        let item3 = FetchItem {
-            name: "item3".to_string(),
-            related: vec![item1.clone(), item2.clone()],
-            ..item1.clone()
-        };
-
-        let fetcher = BaseFetcher {
-            items: vec![item1, item2, item3],
-            url: "http://example.com".to_string(),
-            tree: HtmlTree::default(),
-            fetched: vec![],
-        };
-
-        println!("{}", serde_yaml::to_string(&fetcher).unwrap());
     }
 }

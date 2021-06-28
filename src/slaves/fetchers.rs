@@ -1,10 +1,10 @@
 use anyhow::{anyhow, Result};
 use scraper::{ElementRef, Html, Selector};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 pub type Config = Vec<FetchItem>;
 
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
+#[derive(Debug, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub struct FetchItem {
     pub name: String,
     pub path: String,
@@ -23,39 +23,10 @@ impl FetchItem {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct HtmlTree {
-    pub inner_tree: Html,
-}
-
-impl Default for HtmlTree {
-    fn default() -> Self {
-        HtmlTree {
-            inner_tree: Html::new_document(),
-        }
-    }
-}
-
-impl PartialOrd for HtmlTree {
-    fn partial_cmp(&self, _: &Self) -> Option<std::cmp::Ordering> {
-        Some(std::cmp::Ordering::Equal)
-    }
-}
-
-impl Ord for HtmlTree {
-    fn cmp(&self, _: &Self) -> std::cmp::Ordering {
-        std::cmp::Ordering::Equal
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Deserialize, Debug, PartialEq, PartialOrd, Eq, Ord)]
 pub struct BaseFetcher {
     pub items: Config,
     pub url: String,
-    #[serde(skip)]
-    pub tree: HtmlTree,
-    #[serde(skip)]
-    pub fetched: Vec<Option<String>>,
 }
 
 impl BaseFetcher {
@@ -64,22 +35,21 @@ impl BaseFetcher {
         Ok(Html::parse_document(&resp_text[..]))
     }
 
-    fn select(&self, selector: &str) -> Result<ElementRef> {
+    fn select<'a, 'b>(selector: &'b str, tree: &'a Html) -> Result<ElementRef<'a>> {
         let selector =
             Selector::parse(selector).map_err(|x| anyhow!("Selector parsing errored {:?}", x))?;
-        self.tree
-            .inner_tree
-            .select(&selector)
+        tree.select(&selector)
             .next()
             .ok_or_else(|| anyhow!("Select failed"))
     }
 
-    pub async fn fetch(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.tree.inner_tree = self.get_from_remote().await?;
+    pub async fn fetch(&mut self) -> Result<Vec<Option<String>>, Box<dyn std::error::Error>> {
+        let tree = self.get_from_remote().await?;
+        let mut fetched = vec![];
         for root_item in self.items.iter() {
             for item in root_item.iter() {
-                self.fetched.push({
-                    if let Ok(data) = self.select(&item.path) {
+                fetched.push({
+                    if let Ok(data) = BaseFetcher::select(&item.path, &tree) {
                         Some(item.seek(data))
                     } else {
                         None
@@ -87,7 +57,7 @@ impl BaseFetcher {
                 })
             }
         }
-        Ok(())
+        Ok(fetched)
     }
 }
 
@@ -97,7 +67,7 @@ mod tests {
 
     use scraper::{Html, Selector};
 
-    use crate::slaves::fetchers::{BaseFetcher, FetchItem, HtmlTree};
+    use crate::slaves::fetchers::{BaseFetcher, FetchItem};
 
     #[tokio::test]
     async fn reqwest_works() {
@@ -137,12 +107,10 @@ mod tests {
         let mut fetcher = BaseFetcher {
             items: vec![item1],
             url: "http://example.com/".to_string(),
-            tree: HtmlTree::default(),
-            fetched: vec![],
         };
 
-        fetcher.fetch().await.expect("Fetch failed");
+        let fetched = fetcher.fetch().await.expect("Fetch failed");
 
-        assert_eq!(fetcher.fetched[0].as_ref().unwrap(), "More information...");
+        assert_eq!(fetched[0].as_ref().unwrap(), "More information...");
     }
 }
