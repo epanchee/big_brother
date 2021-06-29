@@ -29,6 +29,7 @@ impl FetchItem {
 pub struct FoundItem<T = String> {
     pub fetch_item: FetchItem,
     pub content: T,
+    pub related: Vec<Option<FoundItem<T>>>
 }
 
 #[derive(Deserialize, Debug, PartialEq, PartialOrd, Eq, Ord)]
@@ -51,22 +52,34 @@ impl BaseFetcher {
             .ok_or_else(|| anyhow!("Select failed"))
     }
 
+    fn process_single_item(item: &FetchItem, tree: &Html) -> Option<FoundItem> {
+        if let Ok(data) = Self::select(&item.path, &tree) {
+            Some(FoundItem {
+                fetch_item: item.clone(),
+                content: item.seek(data),
+                related: vec![]
+            })
+        } else {
+            None
+        }
+    }
+
     pub async fn fetch(&self) -> Result<Vec<Option<FoundItem>>> {
         let tree = self.get_from_remote().await?;
         let mut fetched = vec![];
-        for root_item in self.items.iter() {
-            for item in root_item.iter() {
-                fetched.push({
-                    if let Ok(data) = Self::select(&item.path, &tree) {
-                        Some(FoundItem {
-                            fetch_item: item.clone(),
-                            content: item.seek(data),
-                        })
-                    } else {
-                        None
-                    }
-                })
-            }
+        let primary_items: Vec<_> = self.items.iter().filter(|&item| item.primary).collect();
+        for primary_item in primary_items {
+            let result = if let Some(mut found_item) = Self::process_single_item(&primary_item, &tree) {
+                let mut related_items = vec![];
+                for item in primary_item.related.iter() {
+                    related_items.push(Self::process_single_item(&item, &tree))
+                }
+                found_item.related = related_items.clone();
+                Some(found_item)
+            } else {
+                None
+            };
+            fetched.push(result)
         }
         Ok(fetched)
     }
@@ -116,7 +129,7 @@ mod tests {
         let item1 = FetchItem {
             name: "item1".to_string(),
             path: "body > div > p:nth-child(3) > a".to_string(),
-            primary: false,
+            primary: true,
             item_type: "".to_string(),
             related: vec![],
         };

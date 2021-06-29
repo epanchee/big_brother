@@ -45,7 +45,9 @@ impl FetchDaemon {
                 .map(|list| list.into_iter().flatten().flatten().collect::<Vec<_>>());
 
             if let Ok(data) = fetched {
-                fetched_confs.push(data)
+                if !data.is_empty() {
+                    fetched_confs.push(data)
+                }
             };
         }
 
@@ -65,10 +67,7 @@ impl FetchDaemon {
 
 #[cfg(test)]
 mod tests {
-    use crate::slaves::{
-        config_parser::parse_config_dir,
-        fetchers::{BaseFetcher, FetchItem, FoundItem},
-    };
+    use crate::slaves::fetchers::{BaseFetcher, FetchItem, FoundItem};
 
     use super::FetchDaemon;
 
@@ -115,6 +114,7 @@ mod tests {
 
         let item3 = FetchItem {
             name: "item3".to_string(),
+            primary: true,
             related: vec![item1.clone(), item2.clone()],
             ..item1.clone()
         };
@@ -125,29 +125,31 @@ mod tests {
         };
         let config2 = gen_config2();
 
-        let configs = parse_config_dir("configs");
+        let configs = vec![config1, config2];
         let mut fetched = FetchDaemon::fetch_data(configs).await;
         fetched.sort();
 
         let mut correct = vec![
             FoundItem {
-                fetch_item: item1,
-                content: "More information...".to_string(),
-            },
-            FoundItem {
-                fetch_item: item2,
-                content: "More information...".to_string(),
-            },
-            FoundItem {
                 fetch_item: item3,
                 content: "More information...".to_string(),
+                related: vec![
+                    Some(FoundItem {
+                        fetch_item: item1,
+                        content: "More information...".to_string(),
+                        related: vec![]
+                    }),
+                    Some(FoundItem {
+                        fetch_item: item2,
+                        content: "More information...".to_string(),
+                        related: vec![]
+                    }),
+                ]
             },
         ];
         correct.sort();
 
         // fetched[0].iter().zip(&correct).for_each(|(i1, i2)| assert_eq!(i1, i2));
-        println!("{:#?}", fetched);
-        println!("{:#?}", correct);
         assert_eq!(fetched, vec![correct])
     }
 }
