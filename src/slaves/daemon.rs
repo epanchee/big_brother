@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use super::{
     config_parser::parse_config_dir,
-    fetchers::{Fetcher, FoundItem},
+    fetchers::{Fetchable, Fetcher, FoundItem},
 };
 
 pub struct FetchDaemon {
@@ -25,7 +25,10 @@ impl FetchDaemon {
         }
     }
 
-    async fn fetch_data(configs: Vec<Fetcher>) -> Vec<Vec<FoundItem>> {
+    async fn fetch_data<T>(configs: Vec<Fetcher<T>>) -> Vec<Vec<FoundItem<T>>>
+    where
+        T: Fetchable,
+    {
         let mut pendind_tasks = vec![];
         for config in configs {
             pendind_tasks.push(tokio::spawn(async move {
@@ -67,7 +70,7 @@ impl FetchDaemon {
 
 #[cfg(test)]
 mod tests {
-    use crate::slaves::fetchers::{Fetcher, FetchItem, FoundItem};
+    use crate::slaves::fetchers::{FetchItem, Fetcher, FoundItem};
 
     use super::FetchDaemon;
 
@@ -129,27 +132,24 @@ mod tests {
         let mut fetched = FetchDaemon::fetch_data(configs).await;
         fetched.sort();
 
-        let mut correct = vec![
-            FoundItem {
-                fetch_item: item3,
-                content: "More information...".to_string(),
-                related: vec![
-                    Some(FoundItem {
-                        fetch_item: item1,
-                        content: "More information...".to_string(),
-                        related: vec![]
-                    }),
-                    Some(FoundItem {
-                        fetch_item: item2,
-                        content: "More information...".to_string(),
-                        related: vec![]
-                    }),
-                ]
-            },
-        ];
+        let mut correct = vec![FoundItem {
+            fetch_item: item3,
+            content: "More information...".to_string(),
+            related: vec![
+                Some(FoundItem {
+                    fetch_item: item1,
+                    content: "More information...".to_string(),
+                    related: vec![],
+                }),
+                Some(FoundItem {
+                    fetch_item: item2,
+                    content: "More information...".to_string(),
+                    related: vec![],
+                }),
+            ],
+        }];
         correct.sort();
 
-        // fetched[0].iter().zip(&correct).for_each(|(i1, i2)| assert_eq!(i1, i2));
         assert_eq!(fetched, vec![correct])
     }
 }

@@ -4,8 +4,6 @@ use anyhow::{anyhow, Result};
 use scraper::{ElementRef, Html, Selector};
 use serde::Deserialize;
 
-pub type FetchItems = Vec<FetchItem>;
-
 #[derive(Debug, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub struct FetchItem {
     pub name: String,
@@ -15,10 +13,22 @@ pub struct FetchItem {
     pub related: Vec<FetchItem>,
 }
 
-pub trait Fetchable<Output = String>: Clone {
+pub trait Fetchable<Output = String>:
+    Clone + Sized + std::fmt::Debug + PartialEq + PartialOrd + Ord + Eq + Send + Sync + 'static
+{
     fn seek(&self, data: ElementRef) -> Output;
-    fn select<'a>(&'a self, tree: &'a Html) -> Result<ElementRef>;
-    fn get_name(&self) -> String;
+    fn select<'a>(&'a self, tree: &'a Html) -> Result<ElementRef> {
+        let selector = Selector::parse(self.path())
+            .map_err(|x| anyhow!("Selector parsing errored {:?}", x))?;
+        tree.select(&selector)
+            .next()
+            .ok_or_else(|| anyhow!("Select failed"))
+    }
+    fn name(&self) -> &str;
+    fn path(&self) -> &str;
+    fn primary(&self) -> bool;
+    fn item_type(&self) -> &str;
+    fn related(&self) -> &[Self];
 }
 
 impl Fetchable for FetchItem {
@@ -26,42 +36,59 @@ impl Fetchable for FetchItem {
         data.inner_html()
     }
 
-    fn select<'a>(&'a self, tree: &'a Html) -> Result<ElementRef> {
-        let selector = Selector::parse(&self.path[..])
-            .map_err(|x| anyhow!("Selector parsing errored {:?}", x))?;
-        tree.select(&selector)
-            .next()
-            .ok_or_else(|| anyhow!("Select failed"))
+    fn path(&self) -> &str {
+        self.path.as_str()
     }
 
-    fn get_name(&self) -> String {
-        self.name
+    fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    fn primary(&self) -> bool {
+        self.primary
+    }
+
+    fn item_type(&self) -> &str {
+        self.item_type.as_str()
+    }
+
+    fn related(&self) -> &[Self] {
+        &self.related[..]
     }
 }
 
+/// Abstract structure to store fetch item, its fetched content and content of related items
+///
+/// *fetch_item* - item itself. Should implement Fetchable trait.
+/// *content* - a represenation of fetch action (literally select + seek). May be any type (T) but often it is String.
+/// *related* - an array of related item fetch results. Their content type may differ from original FoundItem thus I represents inner type.  
+///
 #[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
-pub struct FoundItem<T = String, I = String> {
-    pub fetch_item: Box<dyn Fetchable>,
+pub struct FoundItem<F: PartialEq + Fetchable = FetchItem, T = String, I = T> {
+    pub fetch_item: F,
     pub content: T,
-    pub related: Vec<Option<FoundItem<I>>>,
+    pub related: Vec<Option<FoundItem<F, I>>>,
 }
 
 #[derive(Deserialize, Debug, PartialEq, PartialOrd, Eq, Ord)]
-pub struct Fetcher {
-    pub items: FetchItems,
+pub struct Fetcher<F: Fetchable = FetchItem> {
+    pub items: Vec<F>,
     pub url: String,
 }
 
-impl Fetcher {
+impl<T> Fetcher<T>
+where
+    T: Fetchable,
+{
     async fn get_from_remote(&self) -> Result<Html> {
         let resp_text = reqwest::get(&self.url).await?.text().await?;
         Ok(Html::parse_document(&resp_text[..]))
     }
 
-    fn process_single_item(item: &impl Fetchable, tree: &Html) -> Option<FoundItem> {
+    fn process_single_item(item: &T, tree: &Html) -> Option<FoundItem<T>> {
         if let Ok(data) = item.select(&tree) {
             Some(FoundItem {
-                fetch_item: Box::new(item),
+                fetch_item: item.clone(),
                 content: item.seek(data),
                 related: vec![],
             })
@@ -70,18 +97,18 @@ impl Fetcher {
         }
     }
 
-    pub async fn fetch(&self) -> Result<Vec<Option<FoundItem>>> {
+    pub async fn fetch(&self) -> Result<Vec<Option<FoundItem<T>>>> {
         let tree = self.get_from_remote().await?;
         let mut fetched = vec![];
-        let primary_items: Vec<_> = self.items.iter().filter(|&item| item.primary).collect();
+        let primary_items: Vec<_> = self.items.iter().filter(|&item| item.primary()).collect();
         for primary_item in primary_items {
             let result =
                 if let Some(mut found_item) = Self::process_single_item(primary_item, &tree) {
                     let mut related_items = vec![];
-                    for item in primary_item.related.iter() {
+                    for item in primary_item.related().iter() {
                         related_items.push(Self::process_single_item(item, &tree))
                     }
-                    found_item.related = related_items.clone();
+                    found_item.related = related_items;
                     Some(found_item)
                 } else {
                     None
@@ -92,7 +119,10 @@ impl Fetcher {
     }
 }
 
-impl Display for Fetcher {
+impl<T> Display for Fetcher<T>
+where
+    T: Fetchable,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Fetcher: url={}", self.url)
     }
