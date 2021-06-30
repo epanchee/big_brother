@@ -10,7 +10,7 @@ pub struct FetchItem {
     pub path: String,
     pub primary: bool,
     pub item_type: String,
-    pub related: Vec<FetchItem>,
+    pub related: Vec<Self>,
 }
 
 pub trait Fetchable<Output = String>:
@@ -34,6 +34,43 @@ pub trait Fetchable<Output = String>:
 impl Fetchable for FetchItem {
     fn seek(&self, data: ElementRef) -> String {
         data.inner_html()
+    }
+
+    fn path(&self) -> &str {
+        self.path.as_str()
+    }
+
+    fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    fn primary(&self) -> bool {
+        self.primary
+    }
+
+    fn item_type(&self) -> &str {
+        self.item_type.as_str()
+    }
+
+    fn related(&self) -> &[Self] {
+        &self.related[..]
+    }
+}
+
+#[derive(Debug, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
+pub struct ClassFetchItem {
+    pub name: String,
+    pub path: String,
+    pub primary: bool,
+    pub item_type: String,
+    pub related: Vec<Self>,
+}
+
+impl Fetchable<Vec<String>> for ClassFetchItem {
+    fn seek(&self, data: ElementRef) -> Vec<String> {
+        let elem = data.value();
+        println!("{:#?}", elem.classes);
+        todo!()
     }
 
     fn path(&self) -> &str {

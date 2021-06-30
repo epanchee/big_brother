@@ -70,7 +70,7 @@ impl FetchDaemon {
 
 #[cfg(test)]
 mod tests {
-    use crate::slaves::fetchers::{FetchItem, Fetcher, FoundItem};
+    use crate::slaves::fetchers::{ClassFetchItem, FetchItem, Fetcher, FoundItem};
 
     use super::FetchDaemon;
 
@@ -151,5 +151,25 @@ mod tests {
         correct.sort();
 
         assert_eq!(fetched, vec![correct])
+    }
+
+    #[tokio::test]
+    async fn test_class_fetch_item() {
+        let item1 = ClassFetchItem {
+            name: "item1".to_string(),
+            path: "#Packages".to_string(),
+            primary: true,
+            item_type: "".to_string(),
+            related: vec![],
+        };  
+
+        let config1 = Fetcher {
+            items: vec![item1],
+            url: "https://www.lipsum.com/".to_string(),
+        };
+
+        FetchDaemon::fetch_data(vec![config1]).await;
+
+        
     }
 }
