@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use super::{
     config_parser::parse_config_dir,
-    fetchers::{Fetchable, Fetcher, FoundItem},
+    fetchers::{Fetcher, FoundItem},
 };
 
 pub struct FetchDaemon {
@@ -25,10 +25,7 @@ impl FetchDaemon {
         }
     }
 
-    async fn fetch_data<T>(configs: Vec<Fetcher<T>>) -> Vec<Vec<FoundItem<T>>>
-    where
-        T: Fetchable,
-    {
+    async fn fetch_data(configs: Vec<Fetcher>) -> Vec<Vec<FoundItem>> {
         let mut pendind_tasks = vec![];
         for config in configs {
             pendind_tasks.push(tokio::spawn(async move {

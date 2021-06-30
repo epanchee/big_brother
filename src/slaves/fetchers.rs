@@ -13,47 +13,20 @@ pub struct FetchItem {
     pub related: Vec<FetchItem>,
 }
 
-pub trait Fetchable<Output = String>:
-    Clone + Sized + std::fmt::Debug + PartialEq + PartialOrd + Ord + Eq + Send + Sync + 'static
-{
+pub trait Seekable<Output = String> {
     fn seek(&self, data: ElementRef) -> Output;
-    fn select<'a>(&'a self, tree: &'a Html) -> Result<ElementRef> {
-        let selector = Selector::parse(self.path())
+    fn select<'a>(&'a self, tree: &'a Html, path: &str) -> Result<ElementRef> {
+        let selector = Selector::parse(path)
             .map_err(|x| anyhow!("Selector parsing errored {:?}", x))?;
         tree.select(&selector)
             .next()
             .ok_or_else(|| anyhow!("Select failed"))
     }
-    fn name(&self) -> &str;
-    fn path(&self) -> &str;
-    fn primary(&self) -> bool;
-    fn item_type(&self) -> &str;
-    fn related(&self) -> &[Self];
 }
 
-impl Fetchable for FetchItem {
+impl Seekable for FetchItem {
     fn seek(&self, data: ElementRef) -> String {
         data.inner_html()
-    }
-
-    fn path(&self) -> &str {
-        self.path.as_str()
-    }
-
-    fn name(&self) -> &str {
-        self.name.as_str()
-    }
-
-    fn primary(&self) -> bool {
-        self.primary
-    }
-
-    fn item_type(&self) -> &str {
-        self.item_type.as_str()
-    }
-
-    fn related(&self) -> &[Self] {
-        &self.related[..]
     }
 }
 
@@ -64,29 +37,26 @@ impl Fetchable for FetchItem {
 /// *related* - an array of related item fetch results. Their content type may differ from original FoundItem thus I represents inner type.  
 ///
 #[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
-pub struct FoundItem<F: PartialEq + Fetchable = FetchItem, T = String, I = T> {
+pub struct FoundItem<F: PartialEq + Seekable = FetchItem, T = String, I = T> {
     pub fetch_item: F,
     pub content: T,
     pub related: Vec<Option<FoundItem<F, I>>>,
 }
 
 #[derive(Deserialize, Debug, PartialEq, PartialOrd, Eq, Ord)]
-pub struct Fetcher<F: Fetchable = FetchItem> {
-    pub items: Vec<F>,
+pub struct Fetcher {
+    pub items: Vec<FetchItem>,
     pub url: String,
 }
 
-impl<T> Fetcher<T>
-where
-    T: Fetchable,
-{
+impl Fetcher {
     async fn get_from_remote(&self) -> Result<Html> {
         let resp_text = reqwest::get(&self.url).await?.text().await?;
         Ok(Html::parse_document(&resp_text[..]))
     }
 
-    fn process_single_item(item: &T, tree: &Html) -> Option<FoundItem<T>> {
-        if let Ok(data) = item.select(&tree) {
+    fn process_single_item(item: &FetchItem, tree: &Html) -> Option<FoundItem> {
+        if let Ok(data) = item.select(&tree, &item.path) {
             Some(FoundItem {
                 fetch_item: item.clone(),
                 content: item.seek(data),
@@ -97,15 +67,15 @@ where
         }
     }
 
-    pub async fn fetch(&self) -> Result<Vec<Option<FoundItem<T>>>> {
+    pub async fn fetch(&self) -> Result<Vec<Option<FoundItem>>> {
         let tree = self.get_from_remote().await?;
         let mut fetched = vec![];
-        let primary_items: Vec<_> = self.items.iter().filter(|&item| item.primary()).collect();
+        let primary_items: Vec<_> = self.items.iter().filter(|&item| item.primary).collect();
         for primary_item in primary_items {
             let result =
                 if let Some(mut found_item) = Self::process_single_item(primary_item, &tree) {
                     let mut related_items = vec![];
-                    for item in primary_item.related().iter() {
+                    for item in primary_item.related.iter() {
                         related_items.push(Self::process_single_item(item, &tree))
                     }
                     found_item.related = related_items;
@@ -119,10 +89,7 @@ where
     }
 }
 
-impl<T> Display for Fetcher<T>
-where
-    T: Fetchable,
-{
+impl Display for Fetcher {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Fetcher: url={}", self.url)
     }
