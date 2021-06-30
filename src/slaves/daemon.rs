@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use super::{
     config_parser::parse_config_dir,
-    fetchers::{BaseFetcher, FoundItem},
+    fetchers::{Fetcher, FoundItem},
 };
 
 pub struct FetchDaemon {
@@ -25,7 +25,7 @@ impl FetchDaemon {
         }
     }
 
-    async fn fetch_data(configs: Vec<BaseFetcher>) -> Vec<Vec<FoundItem>> {
+    async fn fetch_data(configs: Vec<Fetcher>) -> Vec<Vec<FoundItem>> {
         let mut pendind_tasks = vec![];
         for config in configs {
             pendind_tasks.push(tokio::spawn(async move {
@@ -67,11 +67,11 @@ impl FetchDaemon {
 
 #[cfg(test)]
 mod tests {
-    use crate::slaves::fetchers::{BaseFetcher, FetchItem, FoundItem};
+    use crate::slaves::fetchers::{Fetcher, FetchItem, FoundItem};
 
     use super::FetchDaemon;
 
-    fn gen_config2() -> BaseFetcher {
+    fn gen_config2() -> Fetcher {
         let item_x = FetchItem {
             name: "entity_x".to_string(),
             path: "body > div > p:nth-child(3) > a".to_string(),
@@ -91,7 +91,7 @@ mod tests {
             ..item_x.clone()
         };
 
-        BaseFetcher {
+        Fetcher {
             items: vec![item_x, item_y, item_z],
             url: "http://another-example.com".to_string(),
         }
@@ -119,7 +119,7 @@ mod tests {
             ..item1.clone()
         };
 
-        let config1 = BaseFetcher {
+        let config1 = Fetcher {
             items: vec![item1.clone(), item2.clone(), item3.clone()],
             url: "http://example.com".to_string(),
         };

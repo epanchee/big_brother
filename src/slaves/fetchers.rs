@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use scraper::{ElementRef, Html, Selector};
 use serde::Deserialize;
 
-pub type Config = Vec<FetchItem>;
+pub type FetchItems = Vec<FetchItem>;
 
 #[derive(Debug, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub struct FetchItem {
@@ -15,49 +15,55 @@ pub struct FetchItem {
     pub related: Vec<FetchItem>,
 }
 
-impl FetchItem {
+pub trait Fetchable<Output = String>: Clone {
+    fn seek(&self, data: ElementRef) -> Output;
+    fn select<'a>(&'a self, tree: &'a Html) -> Result<ElementRef>;
+    fn get_name(&self) -> String;
+}
+
+impl Fetchable for FetchItem {
     fn seek(&self, data: ElementRef) -> String {
         data.inner_html()
     }
 
-    fn iter(&self) -> Box<dyn Iterator<Item = &FetchItem> + '_> {
-        Box::new(std::iter::once(self).chain(self.related.iter().flat_map(|x| x.iter())))
-    }
-}
-
-#[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
-pub struct FoundItem<T = String> {
-    pub fetch_item: FetchItem,
-    pub content: T,
-    pub related: Vec<Option<FoundItem<T>>>
-}
-
-#[derive(Deserialize, Debug, PartialEq, PartialOrd, Eq, Ord)]
-pub struct BaseFetcher {
-    pub items: Config,
-    pub url: String,
-}
-
-impl BaseFetcher {
-    async fn get_from_remote(&self) -> Result<Html> {
-        let resp_text = reqwest::get(&self.url).await?.text().await?;
-        Ok(Html::parse_document(&resp_text[..]))
-    }
-
-    fn select<'a, 'b>(selector: &'b str, tree: &'a Html) -> Result<ElementRef<'a>> {
-        let selector =
-            Selector::parse(selector).map_err(|x| anyhow!("Selector parsing errored {:?}", x))?;
+    fn select<'a>(&'a self, tree: &'a Html) -> Result<ElementRef> {
+        let selector = Selector::parse(&self.path[..])
+            .map_err(|x| anyhow!("Selector parsing errored {:?}", x))?;
         tree.select(&selector)
             .next()
             .ok_or_else(|| anyhow!("Select failed"))
     }
 
-    fn process_single_item(item: &FetchItem, tree: &Html) -> Option<FoundItem> {
-        if let Ok(data) = Self::select(&item.path, &tree) {
+    fn get_name(&self) -> String {
+        self.name
+    }
+}
+
+#[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
+pub struct FoundItem<T = String, I = String> {
+    pub fetch_item: Box<dyn Fetchable>,
+    pub content: T,
+    pub related: Vec<Option<FoundItem<I>>>,
+}
+
+#[derive(Deserialize, Debug, PartialEq, PartialOrd, Eq, Ord)]
+pub struct Fetcher {
+    pub items: FetchItems,
+    pub url: String,
+}
+
+impl Fetcher {
+    async fn get_from_remote(&self) -> Result<Html> {
+        let resp_text = reqwest::get(&self.url).await?.text().await?;
+        Ok(Html::parse_document(&resp_text[..]))
+    }
+
+    fn process_single_item(item: &impl Fetchable, tree: &Html) -> Option<FoundItem> {
+        if let Ok(data) = item.select(&tree) {
             Some(FoundItem {
-                fetch_item: item.clone(),
+                fetch_item: Box::new(item),
                 content: item.seek(data),
-                related: vec![]
+                related: vec![],
             })
         } else {
             None
@@ -69,25 +75,26 @@ impl BaseFetcher {
         let mut fetched = vec![];
         let primary_items: Vec<_> = self.items.iter().filter(|&item| item.primary).collect();
         for primary_item in primary_items {
-            let result = if let Some(mut found_item) = Self::process_single_item(&primary_item, &tree) {
-                let mut related_items = vec![];
-                for item in primary_item.related.iter() {
-                    related_items.push(Self::process_single_item(&item, &tree))
-                }
-                found_item.related = related_items.clone();
-                Some(found_item)
-            } else {
-                None
-            };
+            let result =
+                if let Some(mut found_item) = Self::process_single_item(primary_item, &tree) {
+                    let mut related_items = vec![];
+                    for item in primary_item.related.iter() {
+                        related_items.push(Self::process_single_item(item, &tree))
+                    }
+                    found_item.related = related_items.clone();
+                    Some(found_item)
+                } else {
+                    None
+                };
             fetched.push(result)
         }
         Ok(fetched)
     }
 }
 
-impl Display for BaseFetcher {
+impl Display for Fetcher {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "BaseFetcher: url={}", self.url)
+        write!(f, "Fetcher: url={}", self.url)
     }
 }
 
@@ -97,7 +104,7 @@ mod tests {
 
     use scraper::{Html, Selector};
 
-    use crate::slaves::fetchers::{BaseFetcher, FetchItem};
+    use crate::slaves::fetchers::{FetchItem, Fetcher};
 
     #[tokio::test]
     async fn reqwest_works() {
@@ -134,7 +141,7 @@ mod tests {
             related: vec![],
         };
 
-        let fetcher = BaseFetcher {
+        let fetcher = Fetcher {
             items: vec![item1],
             url: "http://example.com/".to_string(),
         };

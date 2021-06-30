@@ -5,21 +5,21 @@ use std::{
 
 use anyhow::{anyhow, Context, Result};
 
-use super::fetchers::BaseFetcher;
+use super::fetchers::Fetcher;
 
-pub fn parse_yaml(config_file: &str) -> Result<BaseFetcher> {
+pub fn parse_yaml(config_file: &str) -> Result<Fetcher> {
     let content = fs::read_to_string(config_file).unwrap();
     serde_yaml::from_str(&content[..]).map_err(|_| anyhow!("Failed to parse yaml content"))
 }
 
-pub fn parse_config_dir(dir_str: &str) -> Vec<BaseFetcher> {
+pub fn parse_config_dir(dir_str: &str) -> Vec<Fetcher> {
     let dir = Path::new(dir_str);
-    let mut configs: Vec<BaseFetcher> = vec![];
+    let mut configs: Vec<Fetcher> = vec![];
     let files = fs::read_dir(dir).unwrap();
     for dir_entry in files {
         let result = dir_entry.map_err(From::from).and_then(|dir_entry| {
             let path = dir_entry.path();
-            let parse_file = || -> Result<BaseFetcher> {
+            let parse_file = || -> Result<Fetcher> {
                 let ext = path
                     .extension()
                     .ok_or_else(|| anyhow!("Path has no extension"))?;
@@ -48,10 +48,10 @@ pub fn parse_config_dir(dir_str: &str) -> Vec<BaseFetcher> {
 pub mod tests {
     use crate::slaves::{
         config_parser::{parse_config_dir, parse_yaml},
-        fetchers::{BaseFetcher, FetchItem},
+        fetchers::{Fetcher, FetchItem},
     };
 
-    fn gen_config1() -> BaseFetcher {
+    fn gen_config1() -> Fetcher {
         let item1 = FetchItem {
             name: "item1".to_string(),
             path: "body > div > p:nth-child(3) > a".to_string(),
@@ -71,13 +71,13 @@ pub mod tests {
             ..item1.clone()
         };
 
-        BaseFetcher {
+        Fetcher {
             items: vec![item1, item2, item3],
             url: "http://example.com".to_string(),
         }
     }
 
-    fn gen_config2() -> BaseFetcher {
+    fn gen_config2() -> Fetcher {
         let item_x = FetchItem {
             name: "entity_x".to_string(),
             path: "body > div > p:nth-child(3) > a".to_string(),
@@ -97,7 +97,7 @@ pub mod tests {
             ..item_x.clone()
         };
 
-        BaseFetcher {
+        Fetcher {
             items: vec![item_x, item_y, item_z],
             url: "http://another-example.com".to_string(),
         }
