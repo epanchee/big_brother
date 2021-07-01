@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use super::{
     config_parser::parse_config_dir,
-    fetchers::{Fetchable, Fetcher, FoundItem},
+    fetchers::{Fetcher, FoundItem},
 };
 
 pub struct FetchDaemon {
@@ -25,10 +25,7 @@ impl FetchDaemon {
         }
     }
 
-    async fn fetch_data<T>(configs: Vec<Fetcher<T>>) -> Vec<Vec<FoundItem<T>>>
-    where
-        T: Fetchable,
-    {
+    async fn fetch_data(configs: Vec<Fetcher>) -> Vec<Vec<FoundItem>> {
         let mut pendind_tasks = vec![];
         for config in configs {
             pendind_tasks.push(tokio::spawn(async move {
@@ -70,7 +67,7 @@ impl FetchDaemon {
 
 #[cfg(test)]
 mod tests {
-    use crate::slaves::fetchers::{ClassFetchItem, FetchItem, Fetcher, FoundItem};
+    use crate::slaves::fetchers::{FetchItem, FetchItemType, Fetcher, FoundItem, FoundItemContent::*};
 
     use super::FetchDaemon;
 
@@ -79,7 +76,7 @@ mod tests {
             name: "entity_x".to_string(),
             path: "body > div > p:nth-child(3) > a".to_string(),
             primary: false,
-            item_type: "".to_string(),
+            item_type: FetchItemType::Text,
             related: vec![],
         };
         let item_y = FetchItem {
@@ -106,7 +103,7 @@ mod tests {
             name: "item1".to_string(),
             path: "body > div > p:nth-child(3) > a".to_string(),
             primary: false,
-            item_type: "".to_string(),
+            item_type: FetchItemType::Text,
             related: vec![],
         };
 
@@ -134,16 +131,16 @@ mod tests {
 
         let mut correct = vec![FoundItem {
             fetch_item: item3,
-            content: "More information...".to_string(),
+            content: Str("More information...".to_string()),
             related: vec![
                 Some(FoundItem {
                     fetch_item: item1,
-                    content: "More information...".to_string(),
+                    content: Str("More information...".to_string()),
                     related: vec![],
                 }),
                 Some(FoundItem {
                     fetch_item: item2,
-                    content: "More information...".to_string(),
+                    content: Str("More information...".to_string()),
                     related: vec![],
                 }),
             ],
@@ -155,15 +152,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_class_fetch_item() {
-        let translations = ClassFetchItem {
+        let translations = FetchItem {
             name: "translations".to_string(),
             path: "#Content > div:nth-child(5)".to_string(),
             primary: true,
-            item_type: "".to_string(),
+            item_type: FetchItemType::Class,
             related: vec![],
         };
 
-        let banner = ClassFetchItem {
+        let banner = FetchItem {
             name: "banner".to_string(),
             path: "#Content > div:nth-child(7)".to_string(),
             ..translations.clone()
@@ -180,13 +177,13 @@ mod tests {
         let correct = vec![
             FoundItem {
                 fetch_item: translations,
-                content: vec!["boxed".to_string()],
-                related: vec![]
+                content: Arr(vec!["boxed".to_string()]),
+                related: vec![],
             },
             FoundItem {
                 fetch_item: banner,
-                content: vec!["boxed".to_string()],
-                related: vec![]
+                content: Arr(vec!["boxed".to_string()]),
+                related: vec![],
             },
         ];
         let mut correct = vec![correct];

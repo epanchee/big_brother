@@ -48,7 +48,7 @@ pub fn parse_config_dir(dir_str: &str) -> Vec<Fetcher> {
 pub mod tests {
     use crate::slaves::{
         config_parser::{parse_config_dir, parse_yaml},
-        fetchers::{Fetcher, FetchItem},
+        fetchers::{FetchItem, FetchItemType, Fetcher},
     };
 
     fn gen_config1() -> Fetcher {
@@ -56,7 +56,7 @@ pub mod tests {
             name: "item1".to_string(),
             path: "body > div > p:nth-child(3) > a".to_string(),
             primary: false,
-            item_type: "".to_string(),
+            item_type: FetchItemType::Text,
             related: vec![],
         };
 
@@ -82,7 +82,7 @@ pub mod tests {
             name: "entity_x".to_string(),
             path: "body > div > p:nth-child(3) > a".to_string(),
             primary: false,
-            item_type: "".to_string(),
+            item_type: FetchItemType::Text,
             related: vec![],
         };
         let item_y = FetchItem {
