@@ -155,21 +155,43 @@ mod tests {
 
     #[tokio::test]
     async fn test_class_fetch_item() {
-        let item1 = ClassFetchItem {
-            name: "item1".to_string(),
-            path: "#Packages".to_string(),
+        let translations = ClassFetchItem {
+            name: "translations".to_string(),
+            path: "#Content > div:nth-child(5)".to_string(),
             primary: true,
             item_type: "".to_string(),
             related: vec![],
-        };  
+        };
+
+        let banner = ClassFetchItem {
+            name: "banner".to_string(),
+            path: "#Content > div:nth-child(7)".to_string(),
+            ..translations.clone()
+        };
 
         let config1 = Fetcher {
-            items: vec![item1],
+            items: vec![translations.clone(), banner.clone()],
             url: "https://www.lipsum.com/".to_string(),
         };
 
-        FetchDaemon::fetch_data(vec![config1]).await;
+        let mut fetched = FetchDaemon::fetch_data(vec![config1]).await;
+        fetched.sort();
 
-        
+        let correct = vec![
+            FoundItem {
+                fetch_item: translations,
+                content: vec!["boxed".to_string()],
+                related: vec![]
+            },
+            FoundItem {
+                fetch_item: banner,
+                content: vec!["boxed".to_string()],
+                related: vec![]
+            },
+        ];
+        let mut correct = vec![correct];
+        correct.sort();
+
+        assert_eq!(fetched, correct)
     }
 }

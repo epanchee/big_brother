@@ -13,10 +13,11 @@ pub struct FetchItem {
     pub related: Vec<Self>,
 }
 
-pub trait Fetchable<Output = String>:
+pub trait Fetchable:
     Clone + Sized + std::fmt::Debug + PartialEq + PartialOrd + Ord + Eq + Send + Sync + 'static
 {
-    fn seek(&self, data: ElementRef) -> Output;
+    type Output: Send;
+    fn seek(&self, data: ElementRef) -> Self::Output;
     fn select<'a>(&'a self, tree: &'a Html) -> Result<ElementRef> {
         let selector = Selector::parse(self.path())
             .map_err(|x| anyhow!("Selector parsing errored {:?}", x))?;
@@ -32,6 +33,8 @@ pub trait Fetchable<Output = String>:
 }
 
 impl Fetchable for FetchItem {
+    type Output = String;
+
     fn seek(&self, data: ElementRef) -> String {
         data.inner_html()
     }
@@ -66,11 +69,17 @@ pub struct ClassFetchItem {
     pub related: Vec<Self>,
 }
 
-impl Fetchable<Vec<String>> for ClassFetchItem {
+impl Fetchable for ClassFetchItem {
+    type Output = Vec<String>;
+
     fn seek(&self, data: ElementRef) -> Vec<String> {
         let elem = data.value();
-        println!("{:#?}", elem.classes);
-        todo!()
+        elem
+            .to_owned()
+            .classes
+            .into_iter()
+            .map(|x| x.to_string())
+            .collect()
     }
 
     fn path(&self) -> &str {
@@ -101,10 +110,10 @@ impl Fetchable<Vec<String>> for ClassFetchItem {
 /// *related* - an array of related item fetch results. Their content type may differ from original FoundItem thus I represents inner type.  
 ///
 #[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
-pub struct FoundItem<F: PartialEq + Fetchable = FetchItem, T = String, I = T> {
+pub struct FoundItem<F: PartialEq + Fetchable = FetchItem> {
     pub fetch_item: F,
-    pub content: T,
-    pub related: Vec<Option<FoundItem<F, I>>>,
+    pub content: F::Output,
+    pub related: Vec<Option<FoundItem<F>>>,
 }
 
 #[derive(Deserialize, Debug, PartialEq, PartialOrd, Eq, Ord)]
