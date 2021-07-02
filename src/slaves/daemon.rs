@@ -67,7 +67,9 @@ impl FetchDaemon {
 
 #[cfg(test)]
 mod tests {
-    use crate::slaves::fetchers::{FetchItem, FetchItemType, Fetcher, FoundItem, FoundItemContent::*};
+    use crate::slaves::fetchers::{
+        FetchItem, FetchItemType, Fetcher, FoundItem, FoundItemContent::*,
+    };
 
     use super::FetchDaemon;
 
@@ -186,6 +188,47 @@ mod tests {
                 related: vec![],
             },
         ];
+        let mut correct = vec![correct];
+        correct.sort();
+
+        assert_eq!(fetched, correct)
+    }
+
+    #[tokio::test]
+    async fn test_mixed_items() {
+        let translations = FetchItem {
+            name: "translations".to_string(),
+            path: "#Content > div:nth-child(5)".to_string(),
+            primary: false,
+            item_type: FetchItemType::Class,
+            related: vec![],
+        };
+
+        let item1 = FetchItem {
+            name: "item1".to_string(),
+            path: "#Content > div:nth-child(5) > strong".to_string(),
+            primary: true,
+            item_type: FetchItemType::Text,
+            related: vec![translations.clone()],
+        };
+
+        let config1 = Fetcher {
+            items: vec![translations.clone(), item1.clone()],
+            url: "https://www.lipsum.com/".to_string(),
+        };
+
+        let mut fetched = FetchDaemon::fetch_data(vec![config1]).await;
+        fetched.sort();
+
+        let correct = vec![FoundItem {
+            fetch_item: item1,
+            content: Str("Translations:".to_string()),
+            related: vec![Some(FoundItem {
+                fetch_item: translations,
+                content: Arr(vec!["boxed".to_string()]),
+                related: vec![],
+            })],
+        }];
         let mut correct = vec![correct];
         correct.sort();
 
