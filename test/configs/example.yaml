@@ -1,0 +1,22 @@
+url: "http://example.com"
+items:
+  - &item1
+    name: item1
+    path: "body > div > p:nth-child(3) > a"
+    primary: false
+    item_type: Text
+    related: []
+  - &item2
+    name: item2
+    path: "body > div > p:nth-child(3) > a"
+    primary: false
+    item_type: Text
+    related: []
+  - 
+    name: item3
+    path: "body > div > p:nth-child(3) > a"
+    primary: false
+    item_type: Text
+    related:
+      - *item1
+      - *item2

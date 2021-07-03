@@ -116,7 +116,7 @@ pub mod tests {
         let config1 = gen_config1();
         let config2 = gen_config2();
 
-        let mut configs = parse_config_dir("configs");
+        let mut configs = parse_config_dir("test/configs");
         configs.sort();
 
         assert_eq!(vec![config2, config1], configs);
