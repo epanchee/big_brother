@@ -41,6 +41,7 @@ dependencies = [
  "scraper",
  "selectors 0.23.0",
  "serde",
+ "serde_json",
  "serde_yaml",
  "tokio",
 ]

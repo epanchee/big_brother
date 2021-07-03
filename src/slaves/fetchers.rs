@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use anyhow::{anyhow, Result};
 use scraper::{ElementRef, Html, Selector};
-use serde::Deserialize;
+use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 
 #[derive(Debug, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub enum FetchItemType {
@@ -11,10 +11,22 @@ pub enum FetchItemType {
 }
 use FetchItemType::*;
 
-#[derive(Debug, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub enum FoundItemContent {
     Str(String),
     Arr(Vec<String>),
+}
+
+impl Serialize for FoundItemContent {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self.to_owned() {
+            Str(val) => val.serialize(serializer),
+            Arr(val) => val.serialize(serializer),
+        }
+    }
 }
 
 use FoundItemContent::*;
@@ -56,6 +68,19 @@ pub struct FoundItem {
     pub fetch_item: FetchItem,
     pub content: FoundItemContent,
     pub related: Vec<Option<FoundItem>>,
+}
+
+impl Serialize for FoundItem {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("FoundItem", 3)?;
+        state.serialize_field("name", &self.fetch_item.name)?;
+        state.serialize_field("content", &self.content)?;
+        state.serialize_field("related", &self.related)?;
+        state.end()
+    }
 }
 
 #[derive(Deserialize, Debug, PartialEq, PartialOrd, Eq, Ord)]

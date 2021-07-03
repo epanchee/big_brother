@@ -2,6 +2,8 @@ use crate::slaves::fetchers::FoundItemContent;
 
 use super::fetchers::{FoundItem, FoundItemContent::*};
 
+use serde_json;
+
 #[derive(Copy, Clone)]
 pub enum SerType {
     Plain,
@@ -24,7 +26,7 @@ pub fn serialize_all(fetched_configs: Vec<Vec<FoundItem>>, sertype: SerType) -> 
 fn serialize(item: FoundItem, sertype: SerType) -> String {
     match sertype {
         Plain => serialize_plain(item).trim().to_string(),
-        Json => unimplemented!(),
+        Json => serde_json::to_string(&item).unwrap(),
         Yaml => unimplemented!(),
     }
 }
@@ -56,8 +58,7 @@ mod tests {
     use crate::slaves::fetchers::{FetchItem, FetchItemType::*, FoundItem, FoundItemContent::*};
     use crate::slaves::serializer::{serialize_all, SerType::*};
 
-    #[test]
-    fn test_serialize_plain() {
+    fn create_test_data() -> Vec<Vec<FoundItem>> {
         let translations = FetchItem {
             name: "translations".to_string(),
             path: "#Content > div:nth-child(5)".to_string(),
@@ -85,10 +86,26 @@ mod tests {
         }];
         let mut correct = vec![correct];
         correct.sort();
+        correct
+    }
+
+    #[test]
+    fn test_serialize_plain() {
+        let data = create_test_data();
 
         assert_eq!(
-            serialize_all(correct, Plain),
+            serialize_all(data, Plain),
             "item1=Translations: : translations=boxed".to_string()
+        )
+    }
+
+    #[test]
+    fn test_serialize_json() {
+        let data = create_test_data();
+
+        assert_eq!(
+            serialize_all(data, Json),
+            r#"{"name":"item1","content":"Translations:","related":[{"name":"translations","content":["boxed"],"related":[]}]}"#
         )
     }
 }
