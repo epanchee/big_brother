@@ -23,7 +23,7 @@ pub fn serialize_all(fetched_configs: Vec<Vec<FoundItem>>, sertype: SerType) -> 
 
 fn serialize(item: FoundItem, sertype: SerType) -> String {
     match sertype {
-        Plain => serialize_plain(item),
+        Plain => serialize_plain(item).trim().to_string(),
         Json => unimplemented!(),
         Yaml => unimplemented!(),
     }
@@ -47,6 +47,48 @@ fn serialize_plain(item: FoundItem) -> String {
                 .map(serialize_plain)
                 .collect::<Vec<_>>()
                 .join("")
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::slaves::fetchers::{FetchItem, FetchItemType::*, FoundItem, FoundItemContent::*};
+    use crate::slaves::serializer::{serialize_all, SerType::*};
+
+    #[test]
+    fn test_serialize_plain() {
+        let translations = FetchItem {
+            name: "translations".to_string(),
+            path: "#Content > div:nth-child(5)".to_string(),
+            primary: false,
+            item_type: Class,
+            related: vec![],
+        };
+
+        let item1 = FetchItem {
+            name: "item1".to_string(),
+            path: "#Content > div:nth-child(5) > strong".to_string(),
+            primary: true,
+            item_type: Text,
+            related: vec![translations.clone()],
+        };
+
+        let correct = vec![FoundItem {
+            fetch_item: item1,
+            content: Str("Translations:".to_string()),
+            related: vec![Some(FoundItem {
+                fetch_item: translations,
+                content: Arr(vec!["boxed".to_string()]),
+                related: vec![],
+            })],
+        }];
+        let mut correct = vec![correct];
+        correct.sort();
+
+        assert_eq!(
+            serialize_all(correct, Plain),
+            "item1=Translations: : translations=boxed".to_string()
         )
     }
 }
