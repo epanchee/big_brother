@@ -11,22 +11,11 @@ pub enum FetchItemType {
 }
 use FetchItemType::*;
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Ord, Eq)]
+#[derive(Debug, Serialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
+#[serde(untagged)]
 pub enum FoundItemContent {
     Str(String),
     Arr(Vec<String>),
-}
-
-impl Serialize for FoundItemContent {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match self.to_owned() {
-            Str(val) => val.serialize(serializer),
-            Arr(val) => val.serialize(serializer),
-        }
-    }
 }
 
 use FoundItemContent::*;
@@ -63,24 +52,21 @@ impl FetchItem {
     }
 }
 
-#[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
-pub struct FoundItem {
-    pub fetch_item: FetchItem,
-    pub content: FoundItemContent,
-    pub related: Vec<Option<FoundItem>>,
-}
-
-impl Serialize for FoundItem {
+impl Serialize for FetchItem {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let mut state = serializer.serialize_struct("FoundItem", 3)?;
-        state.serialize_field("name", &self.fetch_item.name)?;
-        state.serialize_field("content", &self.content)?;
-        state.serialize_field("related", &self.related)?;
-        state.end()
+        self.name.serialize(serializer)
     }
+}
+
+#[derive(Clone, Debug, Serialize, PartialOrd, PartialEq, Ord, Eq)]
+pub struct FoundItem {
+    #[serde(rename = "name")]
+    pub fetch_item: FetchItem,
+    pub content: FoundItemContent,
+    pub related: Vec<Option<FoundItem>>,
 }
 
 #[derive(Deserialize, Debug, PartialEq, PartialOrd, Eq, Ord)]
