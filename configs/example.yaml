@@ -15,7 +15,7 @@ items:
   - 
     name: item3
     path: "body > div > p:nth-child(3) > a"
-    primary: false
+    primary: true
     item_type: Text
     related:
       - *item1
