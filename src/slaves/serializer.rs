@@ -14,34 +14,32 @@ pub enum SerType {
 use SerType::*;
 
 pub fn serialize_all(fetched_configs: Vec<Vec<FoundItem>>, sertype: SerType) -> String {
-    let mut result = vec![];
-    for config in fetched_configs {
-        for item in config {
-            result.push(serialize(item, sertype))
-        }
-    }
-    result.join("")
-}
-
-fn serialize(item: FoundItem, sertype: SerType) -> String {
     match sertype {
-        Plain => serialize_plain(item).trim().to_string(),
-        Json => serde_json::to_string(&item).unwrap(),
+        Plain => {
+            let mut result = vec![];
+            for config in fetched_configs {
+                for item in config {
+                    result.push(serialize_plain(item))
+                }
+            }
+            result.join(" ")
+        }
+        Json => serde_json::to_string(&fetched_configs).unwrap(),
         Yaml => unimplemented!(),
     }
 }
 
 fn serialize_plain(item: FoundItem) -> String {
     let convert2str = |name: String, val: FoundItemContent| match val {
-        Str(val) => format!("{}={} ", name, val),
-        Arr(val) => format!("{}={} ", name, val.into_iter().collect::<Vec<_>>().join("")),
+        Str(val) => format!("{}={}", name, val),
+        Arr(val) => format!("{}={}", name, val.into_iter().collect::<Vec<_>>().join("")),
     };
 
     if item.related.is_empty() {
         convert2str(item.fetch_item.name, item.content)
     } else {
         format!(
-            "{}: {} ",
+            "{}: {}",
             convert2str(item.fetch_item.name, item.content),
             item.related
                 .into_iter()
@@ -95,7 +93,7 @@ mod tests {
 
         assert_eq!(
             serialize_all(data, Plain),
-            "item1=Translations: : translations=boxed".to_string()
+            "item1=Translations:: translations=boxed".to_string()
         )
     }
 
@@ -105,7 +103,7 @@ mod tests {
 
         assert_eq!(
             serialize_all(data, Json),
-            r#"{"name":"item1","content":"Translations:","related":[{"name":"translations","content":["boxed"],"related":[]}]}"#
+            r#"[[{"name":"item1","content":"Translations:","related":[{"name":"translations","content":["boxed"],"related":[]}]}]]"#
         )
     }
 }
