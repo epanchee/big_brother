@@ -2,13 +2,10 @@ use crate::slaves::fetchers::FoundItemContent;
 
 use super::fetchers::{FoundItem, FoundItemContent::*};
 
-use serde_json;
-
 #[derive(Copy, Clone)]
 pub enum SerType {
     Plain,
     Json,
-    Yaml,
 }
 
 use SerType::*;
@@ -25,7 +22,6 @@ pub fn serialize_all(fetched_configs: Vec<Vec<FoundItem>>, sertype: SerType) -> 
             result.join(" ")
         }
         Json => serde_json::to_string(&fetched_configs).unwrap(),
-        Yaml => unimplemented!(),
     }
 }
 
