@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use anyhow::{anyhow, Result};
 use scraper::{ElementRef, Html, Selector};
-use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 
 #[derive(Debug, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub enum FetchItemType {
