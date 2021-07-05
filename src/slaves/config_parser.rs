@@ -67,6 +67,7 @@ pub mod tests {
 
         let item3 = FetchItem {
             name: "item3".to_string(),
+            primary: true,
             related: vec![item1.clone(), item2.clone()],
             ..item1.clone()
         };
