@@ -2,7 +2,7 @@ use crate::slaves::fetchers::FoundItemContent;
 
 use super::fetchers::{FoundItem, FoundItemContent::*};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum SerType {
     Plain,
     Json,

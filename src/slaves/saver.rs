@@ -7,10 +7,10 @@ use super::{
     fetchers::FoundItem,
     serializer::SerType::{self, *},
 };
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use async_recursion::async_recursion;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum SaverType {
     Stdout,
     File(String),
@@ -21,29 +21,38 @@ pub enum SaverType {
 
 use SaverType::*;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Saver {
     stype: SaverType,
     sertype: SerType,
 }
 
 impl Saver {
-    fn new(stype: SaverType, sertype: SerType) -> Self {
+    pub fn new(stype: SaverType, sertype: SerType) -> Self {
         Saver { stype, sertype }
     }
 
-    fn new_default() -> Self {
+    pub fn new_default() -> Self {
         Self::new(Stdout, Json)
     }
 
+    pub fn new_file_json(path: String) -> Self {
+        Self::new(File(path), Json)
+    }
+
+    pub fn new_saver_json(stype: SaverType) -> Self {
+        Self::new(stype, Json)
+    }
+
     #[async_recursion]
-    async fn push(&self, data: Vec<Vec<FoundItem>>) -> Result<()> {
-        let ser_data = serialize_all(data.to_vec(), self.sertype);
+    pub async fn push(&self, data: Vec<Vec<FoundItem>>) -> Result<()> {
+        let mut ser_data = serialize_all(data.to_vec(), self.sertype);
         match self.stype.clone() {
             Stdout => println!("{}", ser_data),
             File(path) => {
                 let mut op = OpenOptions::new();
                 let mut file = op.create(true).append(true).open(path).await?;
+                ser_data.push('\n');
                 file.write_all(ser_data.as_bytes()).await?;
                 file.sync_all().await?;
             }

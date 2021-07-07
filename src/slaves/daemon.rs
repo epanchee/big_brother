@@ -1,33 +1,31 @@
 use std::time::Duration;
 
-use crate::slaves::serializer::serialize_all;
-
 use super::{
     config_parser::parse_config_dir,
     fetchers::{Fetcher, FoundItem},
-    serializer::SerType,
+    saver::Saver,
 };
 
 pub struct FetchDaemon {
     interval: Duration,
     conf_path: String,
-    sertype: SerType,
+    saver: Saver,
 }
 
 impl FetchDaemon {
-    pub fn new(interval: Duration, conf_path: String, sertype: SerType) -> Self {
+    pub fn new(interval: Duration, conf_path: String, saver: Saver) -> Self {
         FetchDaemon {
             interval,
             conf_path,
-            sertype,
+            saver,
         }
     }
 
-    pub fn new_default(interval: Duration) -> Self {
+    pub fn new_default(interval: Duration, saver: Saver) -> Self {
         FetchDaemon {
             interval,
             conf_path: "configs".to_string(),
-            sertype: SerType::Json,
+            saver,
         }
     }
 
@@ -64,7 +62,7 @@ impl FetchDaemon {
         loop {
             let configs = parse_config_dir(&self.conf_path[..]);
             let fetched = Self::fetch_data(configs).await;
-            println!("{}", serialize_all(fetched, self.sertype));
+            self.saver.push(fetched).await;
             println!("Going to sleep for {} secs...", self.interval.as_secs());
             tokio::time::sleep(self.interval).await;
         }
