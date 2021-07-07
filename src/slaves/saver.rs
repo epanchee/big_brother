@@ -10,6 +10,7 @@ use super::{
 use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
 
+#[derive(Clone)]
 pub enum SaverType {
     Stdout,
     File(String),
@@ -20,6 +21,7 @@ pub enum SaverType {
 
 use SaverType::*;
 
+#[derive(Clone)]
 pub struct Saver {
     stype: SaverType,
     sertype: SerType,
@@ -35,9 +37,9 @@ impl Saver {
     }
 
     #[async_recursion]
-    async fn push(&'static self, data: &'static Vec<Vec<FoundItem>>) -> Result<()> {
-        let ser_data = serialize_all(data.clone(), self.sertype);
-        match &self.stype {
+    async fn push(&self, data: Vec<Vec<FoundItem>>) -> Result<()> {
+        let ser_data = serialize_all(data.to_vec(), self.sertype);
+        match self.stype.clone() {
             Stdout => println!("{}", ser_data),
             File(path) => {
                 let mut op = OpenOptions::new();
@@ -46,9 +48,10 @@ impl Saver {
                 file.sync_all().await?;
             }
             Multiple(sinks) => {
-                let handlers = sinks
-                    .iter()
-                    .map(|sink| tokio::spawn(async move { sink.push(&data).await }));
+                let handlers = sinks.iter().cloned().map(|sink| {
+                    let data = data.clone();
+                    tokio::spawn(async move { sink.push(data).await })
+                });
                 for handler in handlers {
                     handler.await?;
                 }
@@ -111,7 +114,7 @@ mod tests {
         let saver = Saver::new(File(path.clone()), SerType::Json);
         let test_data = create_test_data();
 
-        saver.push(&test_data).await.unwrap();
+        saver.push(test_data).await.unwrap();
         let mut content = vec![];
         File::open(path.clone())
             .await
