@@ -133,9 +133,8 @@ mod tests {
             .unwrap();
         fs::remove_file(path).unwrap();
 
-        assert_eq!(
-            String::from_utf8(content).unwrap(),
-            r#"[[{"name":"item1","content":"Translations:","related":[{"name":"translations","content":["boxed"],"related":[]}]}]]"#.to_string()
-        );
+        let correct = r#"[[{"name":"item1","content":"Translations:","related":[{"name":"translations","content":["boxed"],"related":[]}]}]]"#.to_string() + "\n";
+
+        assert_eq!(String::from_utf8(content).unwrap(), correct);
     }
 }
