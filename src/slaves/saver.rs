@@ -8,11 +8,12 @@ use super::{
     serializer::SerType::{self, *},
 };
 use anyhow::{anyhow, Result};
+use async_recursion::async_recursion;
 
 pub enum SaverType {
     Stdout,
     File(String),
-    Multiple(Vec<SaverType>),
+    Multiple(Vec<Saver>),
     Telegram,
     Postgres,
 }
@@ -33,8 +34,9 @@ impl Saver {
         Self::new(Stdout, Json)
     }
 
-    async fn push(&self, data: Vec<Vec<FoundItem>>) -> Result<()> {
-        let ser_data = serialize_all(data, self.sertype);
+    #[async_recursion]
+    async fn push(&'static self, data: &'static Vec<Vec<FoundItem>>) -> Result<()> {
+        let ser_data = serialize_all(data.clone(), self.sertype);
         match &self.stype {
             Stdout => println!("{}", ser_data),
             File(path) => {
@@ -43,7 +45,14 @@ impl Saver {
                 file.write_all(ser_data.as_bytes()).await?;
                 file.sync_all().await?;
             }
-            Multiple(_) => unimplemented!(),
+            Multiple(sinks) => {
+                let handlers = sinks
+                    .iter()
+                    .map(|sink| tokio::spawn(async move { sink.push(&data).await }));
+                for handler in handlers {
+                    handler.await?;
+                }
+            }
             Telegram => unimplemented!(),
             Postgres => unimplemented!(),
         }
@@ -102,7 +111,7 @@ mod tests {
         let saver = Saver::new(File(path.clone()), SerType::Json);
         let test_data = create_test_data();
 
-        saver.push(test_data.clone()).await.unwrap();
+        saver.push(&test_data).await.unwrap();
         let mut content = vec![];
         File::open(path.clone())
             .await
