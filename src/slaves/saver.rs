@@ -107,7 +107,7 @@ mod tests {
         File::open(path.clone())
             .await
             .unwrap()
-            .read_buf(&mut content)
+            .read_to_end(&mut content)
             .await
             .unwrap();
         fs::remove_file(path).unwrap();
