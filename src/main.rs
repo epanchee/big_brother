@@ -10,8 +10,7 @@ async fn main() {
         Saver::new_default(),
         Saver::new_file_json("/tmp/fetched.txt".to_string()),
     ];
-    let savetype = SaverType::Multiple(savers);
-    let saver = Saver::new_saver_json(savetype);
+    let saver = Saver::new_saver_json(SaverType::Multiple(savers));
     
     FetchDaemon::new_default(Duration::from_secs(10), saver)
         .start()
