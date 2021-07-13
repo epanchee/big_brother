@@ -4,8 +4,6 @@ use anyhow::{anyhow, Result};
 use scraper::{ElementRef, Html, Selector};
 use serde::{Deserialize, Serialize, Serializer};
 
-use async_trait::async_trait;
-
 #[derive(Debug, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub enum FetchItemType {
     Class,
@@ -21,11 +19,6 @@ pub enum FoundItemContent {
 }
 
 use FoundItemContent::*;
-
-#[async_trait]
-pub trait Fetchable {
-    async fn fetch(&self) -> Result<Vec<Option<FoundItem>>>;
-}
 
 #[derive(Debug, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub struct FetchItem {
@@ -99,11 +92,8 @@ impl Fetcher {
             None
         }
     }
-}
 
-#[async_trait]
-impl Fetchable for Fetcher {
-    async fn fetch(&self) -> Result<Vec<Option<FoundItem>>> {
+    pub async fn fetch(&self) -> Result<Vec<Option<FoundItem>>> {
         let tree = self.get_from_remote().await?;
         let mut fetched = vec![];
         let primary_items: Vec<_> = self.items.iter().filter(|&item| item.primary).collect();
@@ -137,7 +127,7 @@ mod tests {
 
     use scraper::{Html, Selector};
 
-    use crate::slaves::fetchers::{FetchItem, FetchItemType, Fetchable, Fetcher, FoundItemContent};
+    use crate::slaves::fetchers::{FetchItem, FetchItemType, Fetcher, FoundItemContent};
 
     #[tokio::test]
     async fn reqwest_works() {
@@ -179,7 +169,7 @@ mod tests {
             url: "http://example.com/".to_string(),
         };
 
-        let fetched = Fetchable::fetch(&fetcher).await.expect("Fetch failed");
+        let fetched = fetcher.fetch().await.expect("Fetch failed");
 
         assert_eq!(
             fetched[0].as_ref().unwrap().content,

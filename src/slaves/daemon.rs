@@ -1,7 +1,5 @@
 use std::time::Duration;
 
-use crate::slaves::fetchers::Fetchable;
-
 use super::{
     config_parser::parse_config_dir,
     fetchers::{Fetcher, FoundItem},
@@ -35,7 +33,7 @@ impl FetchDaemon {
         let mut pendind_tasks = vec![];
         for config in configs {
             pendind_tasks.push(tokio::spawn(async move {
-                if let Ok(data) = Fetchable::fetch(&config).await {
+                if let Ok(data) = config.fetch().await {
                     Some(data)
                 } else {
                     println!("Couldn't fetch any data in {}", config);
