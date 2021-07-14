@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use super::{
     config_parser::parse_config_dir,
-    fetchers::{Fetcher, FoundItem},
+    fetchers::{FetcherConfig, FoundItem, Fetchable},
     saver::Saver,
 };
 
@@ -29,14 +29,14 @@ impl FetchDaemon {
         }
     }
 
-    async fn fetch_data(configs: Vec<Fetcher>) -> Vec<Vec<FoundItem>> {
+    async fn fetch_data(fetchers: Vec<impl Fetchable>) -> Vec<Vec<FoundItem>> {
         let mut pendind_tasks = vec![];
-        for config in configs {
+        for fetcher in fetchers {
             pendind_tasks.push(tokio::spawn(async move {
-                if let Ok(data) = config.fetch().await {
+                if let Ok(data) = fetcher.fetch().await {
                     Some(data)
                 } else {
-                    println!("Couldn't fetch any data in {}", config);
+                    println!("Couldn't fetch any data in {:?}", fetcher);
                     None
                 }
             }));
@@ -60,8 +60,8 @@ impl FetchDaemon {
 
     pub async fn start(self) {
         loop {
-            let configs = parse_config_dir(&self.conf_path[..]);
-            let fetched = Self::fetch_data(configs).await;
+            let fetchers = parse_config_dir(&self.conf_path[..]);
+            let fetched = Self::fetch_data(fetchers).await;
             self.saver.push(fetched).await;
             println!("Going to sleep for {} secs...", self.interval.as_secs());
             tokio::time::sleep(self.interval).await;
@@ -72,12 +72,12 @@ impl FetchDaemon {
 #[cfg(test)]
 mod tests {
     use crate::slaves::fetchers::{
-        FetchItem, FetchItemType, Fetcher, FoundItem, FoundItemContent::*,
+        FetchItem, FetchItemType, FetcherConfig, FoundItem, FoundItemContent::*,
     };
 
     use super::FetchDaemon;
 
-    fn gen_config2() -> Fetcher {
+    fn gen_config2() -> FetcherConfig {
         let item_x = FetchItem {
             name: "entity_x".to_string(),
             path: "body > div > p:nth-child(3) > a".to_string(),
@@ -97,7 +97,7 @@ mod tests {
             ..item_x.clone()
         };
 
-        Fetcher {
+        FetcherConfig {
             items: vec![item_x, item_y, item_z],
             url: "http://another-example.com".to_string(),
         }
@@ -125,7 +125,7 @@ mod tests {
             ..item1.clone()
         };
 
-        let config1 = Fetcher {
+        let config1 = FetcherConfig {
             items: vec![item1.clone(), item2.clone(), item3.clone()],
             url: "http://example.com".to_string(),
         };
@@ -172,7 +172,7 @@ mod tests {
             ..translations.clone()
         };
 
-        let config1 = Fetcher {
+        let config1 = FetcherConfig {
             items: vec![translations.clone(), banner.clone()],
             url: "https://www.lipsum.com/".to_string(),
         };
@@ -216,7 +216,7 @@ mod tests {
             related: vec![translations.clone()],
         };
 
-        let config1 = Fetcher {
+        let config1 = FetcherConfig {
             items: vec![translations.clone(), item1.clone()],
             url: "https://www.lipsum.com/".to_string(),
         };

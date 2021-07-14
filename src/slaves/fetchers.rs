@@ -1,8 +1,10 @@
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 use anyhow::{anyhow, Result};
 use scraper::{ElementRef, Html, Selector};
 use serde::{Deserialize, Serialize, Serializer};
+
+use async_trait::async_trait;
 
 #[derive(Debug, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub enum FetchItemType {
@@ -70,14 +72,26 @@ pub struct FoundItem {
 }
 
 #[derive(Deserialize, Debug, PartialEq, PartialOrd, Eq, Ord)]
-pub struct Fetcher {
+pub struct FetcherConfig {
     pub items: Vec<FetchItem>,
     pub url: String,
 }
 
-impl Fetcher {
+type FetchResults = Vec<Option<FoundItem>>;
+
+#[async_trait]
+pub trait Fetchable: Debug {
+    async fn fetch(&self) -> Result<FetchResults>;
+}
+
+#[derive(Debug, PartialOrd, PartialEq, Ord, Eq)]
+pub struct SimpleFetcher {
+    pub config: FetcherConfig,
+}
+
+impl SimpleFetcher {
     async fn get_from_remote(&self) -> Result<Html> {
-        let resp_text = reqwest::get(&self.url).await?.text().await?;
+        let resp_text = reqwest::get(&self.config.url).await?.text().await?;
         Ok(Html::parse_document(&resp_text[..]))
     }
 
@@ -92,11 +106,19 @@ impl Fetcher {
             None
         }
     }
+}
 
-    pub async fn fetch(&self) -> Result<Vec<Option<FoundItem>>> {
+#[async_trait]
+impl Fetchable for SimpleFetcher {
+    async fn fetch(&self) -> Result<FetchResults> {
         let tree = self.get_from_remote().await?;
         let mut fetched = vec![];
-        let primary_items: Vec<_> = self.items.iter().filter(|&item| item.primary).collect();
+        let primary_items: Vec<_> = self
+            .config
+            .items
+            .iter()
+            .filter(|&item| item.primary)
+            .collect();
         for primary_item in primary_items {
             let result =
                 if let Some(mut found_item) = Self::process_single_item(primary_item, &tree) {
@@ -115,9 +137,9 @@ impl Fetcher {
     }
 }
 
-impl Display for Fetcher {
+impl Display for SimpleFetcher {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Fetcher: url={}", self.url)
+        write!(f, "Fetcher: url={}", self.config.url)
     }
 }
 
@@ -127,7 +149,9 @@ mod tests {
 
     use scraper::{Html, Selector};
 
-    use crate::slaves::fetchers::{FetchItem, FetchItemType, Fetcher, FoundItemContent};
+    use crate::slaves::fetchers::{
+        FetchItem, FetchItemType, Fetchable, FetcherConfig, FoundItemContent, SimpleFetcher,
+    };
 
     #[tokio::test]
     async fn reqwest_works() {
@@ -164,9 +188,11 @@ mod tests {
             related: vec![],
         };
 
-        let fetcher = Fetcher {
-            items: vec![item1],
-            url: "http://example.com/".to_string(),
+        let fetcher = SimpleFetcher {
+            config: FetcherConfig {
+                items: vec![item1],
+                url: "http://example.com/".to_string(),
+            },
         };
 
         let fetched = fetcher.fetch().await.expect("Fetch failed");

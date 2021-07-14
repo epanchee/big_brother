@@ -5,21 +5,22 @@ use std::{
 
 use anyhow::{anyhow, Context, Result};
 
-use super::fetchers::Fetcher;
+use super::fetchers::{Fetchable, FetcherConfig, SimpleFetcher};
 
-pub fn parse_yaml(config_file: &str) -> Result<Fetcher> {
+pub fn parse_yaml(config_file: &str) -> Result<Box<dyn Fetchable>> {
     let content = fs::read_to_string(config_file).unwrap();
-    serde_yaml::from_str(&content[..]).map_err(|_| anyhow!("Failed to parse yaml content"))
+    let config: FetcherConfig = serde_yaml::from_str(&content[..])?;
+    Ok(Box::new(SimpleFetcher { config }))
 }
 
-pub fn parse_config_dir(dir_str: &str) -> Vec<Fetcher> {
+pub fn parse_config_dir(dir_str: &str) -> Vec<Box<dyn Fetchable>> {
     let dir = Path::new(dir_str);
-    let mut configs: Vec<Fetcher> = vec![];
+    let mut fetchers: Vec<Box<dyn Fetchable>> = vec![];
     let files = fs::read_dir(dir).unwrap();
     for dir_entry in files {
         let result = dir_entry.map_err(From::from).and_then(|dir_entry| {
             let path = dir_entry.path();
-            let parse_file = || -> Result<Fetcher> {
+            let parse_file = || -> Result<Box<dyn Fetchable>> {
                 let ext = path
                     .extension()
                     .ok_or_else(|| anyhow!("Path has no extension"))?;
@@ -36,22 +37,22 @@ pub fn parse_config_dir(dir_str: &str) -> Vec<Fetcher> {
         });
 
         if let Ok(config) = result {
-            configs.push(config);
+            fetchers.push(config);
         } else {
             println!("{:?}", result);
         }
     }
-    configs
+    fetchers
 }
 
 #[cfg(test)]
 pub mod tests {
     use crate::slaves::{
         config_parser::{parse_config_dir, parse_yaml},
-        fetchers::{FetchItem, FetchItemType, Fetcher},
+        fetchers::{FetchItem, FetchItemType, FetcherConfig, SimpleFetcher},
     };
 
-    fn gen_config1() -> Fetcher {
+    fn gen_config1() -> SimpleFetcher {
         let item1 = FetchItem {
             name: "item1".to_string(),
             path: "body > div > p:nth-child(3) > a".to_string(),
@@ -72,13 +73,15 @@ pub mod tests {
             ..item1.clone()
         };
 
-        Fetcher {
+        let config = FetcherConfig {
             items: vec![item1, item2, item3],
             url: "http://example.com".to_string(),
-        }
+        };
+
+        SimpleFetcher { config }
     }
 
-    fn gen_config2() -> Fetcher {
+    fn gen_config2() -> FetcherConfig {
         let item_x = FetchItem {
             name: "entity_x".to_string(),
             path: "body > div > p:nth-child(3) > a".to_string(),
@@ -98,7 +101,7 @@ pub mod tests {
             ..item_x.clone()
         };
 
-        Fetcher {
+        FetcherConfig {
             items: vec![item_x, item_y, item_z],
             url: "http://another-example.com".to_string(),
         }
@@ -108,7 +111,6 @@ pub mod tests {
     fn test_parse_yaml() {
         let config = gen_config1();
         let mut fetch_items = parse_yaml("configs/example.yaml").unwrap();
-        fetch_items.items.sort();
         assert_eq!(config, fetch_items);
     }
 
@@ -118,7 +120,6 @@ pub mod tests {
         let config2 = gen_config2();
 
         let mut configs = parse_config_dir("test/configs");
-        configs.sort();
 
         assert_eq!(vec![config2, config1], configs);
 
