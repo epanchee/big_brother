@@ -10,7 +10,7 @@ edition = "2018"
 openssl = { version = "0.10" }
 openssl-sys = { version = "0.9.65" }
 reqwest = { version = "0.11.4", features = ["json", "cookies", "default-tls"] }
-tokio = { version = "1.7.0", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
 scraper = "0.12.0"
 selectors = "0.23.0"
 anyhow = "1.0.41"

@@ -5,7 +5,7 @@ use anyhow::Result;
 use rutebot::{client::Rutebot, requests::SendMessage, responses::Message};
 use tokio::sync::mpsc::{self, Receiver, Sender};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum Signal<T = String> {
     Action(T),
     Msg(T),
@@ -47,10 +47,10 @@ impl TgNotifier {
 
     async fn process_signal(signal: Signal, bot: &RutebotWrapper) -> Result<()> {
         println!("{}", signal);
-/*         bot.0
-            .prepare_api_request(SendMessage::new(&bot.1[..], &signal.to_string()[..]))
-            .send()
-            .await?; */
+        /*         bot.0
+        .prepare_api_request(SendMessage::new(&bot.1[..], &signal.to_string()[..]))
+        .send()
+        .await?; */
         Ok(())
     }
 }
@@ -61,7 +61,7 @@ mod tests {
 
     use super::{Signal::*, TgNotifier};
 
-    use futures::{future::join_all, FutureExt};
+    use futures::{future::try_join_all, FutureExt};
 
     #[tokio::test]
     async fn test_notifier() {
@@ -79,6 +79,6 @@ mod tests {
             tx3.send(Err("Crashed".to_string())).boxed(),
         ];
 
-        join_all(futures).await;
+        try_join_all(futures).await.unwrap();
     }
 }
