@@ -1,12 +1,12 @@
 use std::fmt::Display;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
 use rutebot::{client::Rutebot, requests::SendMessage, responses::Message};
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::sync::mpsc::{self, Sender};
 
 #[derive(Clone, Copy, Debug)]
-enum Signal<T = String> {
+pub enum Signal<T: Display = String> {
     Action(T),
     Msg(T),
     Err(T),
@@ -22,30 +22,45 @@ impl Display for Signal {
     }
 }
 
+#[derive(Clone)]
 struct RutebotWrapper(Rutebot, String);
 
-pub struct TgNotifier {
-    tx: Sender<Signal>,
+#[derive(Clone)]
+pub struct TgNotifier<T: Display = String> {
+    tx: Option<Sender<Signal<T>>>,
+    bot: RutebotWrapper,
 }
 
-impl TgNotifier {
+impl<T> TgNotifier<T>
+where
+    T: Display + Send,
+    Signal<T>: Display,
+{
     pub fn new(token: &str, chat_id: &str) -> Self {
-        let (tx, rx) = mpsc::channel(32);
         let bot = RutebotWrapper(Rutebot::new(token), chat_id.to_string());
-        let notifier = Self { tx };
-        Self::start(rx, bot);
-        notifier
+        Self { tx: None, bot }
     }
 
-    fn start(mut rx: Receiver<Signal>, bot: RutebotWrapper) {
+    fn start(&'static mut self) {
         tokio::spawn(async move {
+            let (tx, mut rx) = mpsc::channel(32);
+            self.tx = Some(tx);
             while let Some(signal) = rx.recv().await {
-                Self::process_signal(signal, &bot).await.unwrap();
+                Self::process_signal(signal, &self.bot).await.unwrap();
             }
         });
     }
 
-    async fn process_signal(signal: Signal, bot: &RutebotWrapper) -> Result<()> {
+    async fn send(&self, signal: Signal<T>) -> Result<()> {
+        self.tx
+            .as_ref()
+            .ok_or_else(|| anyhow!("No tx avalible"))?
+            .send(signal)
+            .await
+            .map_err(|_| anyhow!("Send error"))
+    }
+
+    async fn process_signal(signal: Signal<T>, bot: &RutebotWrapper) -> Result<()> {
         println!("{}", signal);
         /*         bot.0
         .prepare_api_request(SendMessage::new(&bot.1[..], &signal.to_string()[..]))
@@ -66,17 +81,16 @@ mod tests {
     #[tokio::test]
     async fn test_notifier() {
         let notifier = TgNotifier::new("", "");
-        let tx2 = notifier.tx.clone();
-        let tx3 = notifier.tx.clone();
+        let notifier2 = notifier.clone();
 
         let futures = vec![
             async move {
                 tokio::time::sleep(Duration::from_secs(1)).await;
-                notifier.tx.send(Msg("Hello, World!".to_string())).await
+                notifier2.send(Msg("Hello, World!".to_string())).await
             }
             .boxed(),
-            tx2.send(Action("You must do it".to_string())).boxed(),
-            tx3.send(Err("Crashed".to_string())).boxed(),
+            notifier.send(Action("You must do it".to_string())).boxed(),
+            notifier.send(Err("Crashed".to_string())).boxed(),
         ];
 
         try_join_all(futures).await.unwrap();
