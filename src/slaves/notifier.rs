@@ -1,8 +1,9 @@
-use std::fmt::Display;
+use std::{fmt::Display, fs};
 
 use anyhow::{anyhow, Result};
 
 use rutebot::{client::Rutebot, requests::SendMessage};
+use serde::Deserialize;
 use tokio::{
     sync::mpsc::{self, Receiver, Sender},
     task::JoinHandle,
@@ -28,6 +29,12 @@ impl Display for Signal {
 #[derive(Clone)]
 struct RutebotWrapper(Rutebot, String);
 
+#[derive(Deserialize)]
+pub struct TgConfig {
+    token: String,
+    chat_id: String,
+}
+
 #[derive(Clone)]
 pub struct TgNotifier<T: Display + Send = String> {
     tx: Sender<Signal<T>>,
@@ -38,14 +45,20 @@ where
     T: Display + Send + 'static,
     Signal<T>: Display,
 {
-    pub fn new(token: &str, chat_id: &str) -> Self {
-        Self::new_with_loop_handle(token, chat_id).0
+    pub fn new() -> Result<Self> {
+        Ok(Self::new_with_loop_handle()?.0)
     }
 
-    pub fn new_with_loop_handle(token: &str, chat_id: &str) -> (Self, JoinHandle<()>) {
+    pub fn new_with_loop_handle() -> Result<(Self, JoinHandle<()>)> {
         let (tx, rx) = mpsc::channel(32);
-        let bot = RutebotWrapper(Rutebot::new(token), chat_id.to_string());
-        (Self { tx }, Self::create_channel_loop(rx, bot))
+        let bot = Self::create_bot_from_conf()?;
+        Ok((Self { tx }, Self::create_channel_loop(rx, bot)))
+    }
+
+    fn create_bot_from_conf() -> Result<RutebotWrapper> {
+        let content = fs::read_to_string("config/tg.yaml")?;
+        let conf: TgConfig = serde_yaml::from_str(&content)?;
+        Ok(RutebotWrapper(Rutebot::new(conf.token), conf.chat_id))
     }
 
     fn create_channel_loop(mut rx: Receiver<Signal<T>>, bot: RutebotWrapper) -> JoinHandle<()> {
@@ -84,9 +97,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_notifier() {
-        let (notifier, loop_h) = TgNotifier::new_with_loop_handle(
-
-        );
+        let (notifier, loop_h) = TgNotifier::new_with_loop_handle().unwrap();
         let notifier2 = notifier.clone();
 
         let futures = vec![
