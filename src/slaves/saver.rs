@@ -1,4 +1,7 @@
-use crate::slaves::serializer::serialize_all;
+use crate::slaves::{
+    notifier::{Signal, TgNotifier},
+    serializer::serialize_all,
+};
 
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
@@ -22,14 +25,40 @@ pub enum SaverType {
 use SaverType::*;
 
 #[derive(Clone, Debug)]
+enum SaverBackend {
+    Notifier(TgNotifier),
+    Nothing,
+}
+
+#[derive(Clone, Debug)]
 pub struct Saver {
     stype: SaverType,
     sertype: SerType,
+    backend: SaverBackend,
 }
 
 impl Saver {
     pub fn new(stype: SaverType, sertype: SerType) -> Self {
-        Saver { stype, sertype }
+        let backend = Self::setup(&stype);
+        Saver {
+            stype,
+            sertype,
+            backend,
+        }
+    }
+
+    fn setup(stype: &SaverType) -> SaverBackend {
+        match stype {
+            Telegram => TgNotifier::new().map_or_else(
+                |err| {
+                    println!("{}", err);
+                    SaverBackend::Nothing
+                },
+                SaverBackend::Notifier,
+            ),
+            Postgres => todo!(),
+            _ => SaverBackend::Nothing,
+        }
     }
 
     pub fn new_default() -> Self {
@@ -65,7 +94,16 @@ impl Saver {
                     handler.await?;
                 }
             }
-            Telegram => unimplemented!(),
+            Telegram => {
+                if let SaverBackend::Notifier(notifier) = &self.backend {
+                    let res = notifier.send(Signal::Msg(ser_data)).await;
+                    if res.is_err() {
+                        println!("{:?}", res)
+                    }
+                } else {
+                    println!("Telegram notifier wasn't initialized. Can not send message")
+                }
+            }
             Postgres => unimplemented!(),
         }
         Ok(())

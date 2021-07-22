@@ -35,7 +35,7 @@ pub struct TgConfig {
     chat_id: String,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TgNotifier<T: Display + Send = String> {
     tx: Sender<Signal<T>>,
 }
@@ -69,7 +69,7 @@ where
         })
     }
 
-    async fn send(&self, signal: Signal<T>) -> Result<()> {
+    pub async fn send(&self, signal: Signal<T>) -> Result<()> {
         self.tx
             .send(signal)
             .await
