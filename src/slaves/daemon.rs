@@ -24,7 +24,7 @@ impl FetchDaemon {
     pub fn new_default(interval: Duration, saver: Saver) -> Self {
         FetchDaemon {
             interval,
-            conf_path: "configs".to_string(),
+            conf_path: "aims".to_string(),
             saver,
         }
     }

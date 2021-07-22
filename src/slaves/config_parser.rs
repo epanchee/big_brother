@@ -107,7 +107,7 @@ pub mod tests {
     #[test]
     fn test_parse_yaml() {
         let config = gen_config1();
-        let mut fetch_items = parse_yaml("configs/example.yaml").unwrap();
+        let mut fetch_items = parse_yaml("test/configs/example.yaml").unwrap();
         fetch_items.items.sort();
         assert_eq!(config, fetch_items);
     }
