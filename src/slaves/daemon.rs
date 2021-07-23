@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use super::{
     config_parser::parse_config_dir,
-    fetchers::{FetcherConfig, FoundItem, Fetchable},
+    fetchers::{Fetchable, FoundItem},
     saver::Saver,
 };
 
@@ -29,11 +29,12 @@ impl FetchDaemon {
         }
     }
 
-    async fn fetch_data(fetchers: Vec<impl Fetchable>) -> Vec<Vec<FoundItem>> {
+    async fn fetch_data(fetchers: Vec<Box<impl Fetchable>>) -> Vec<Vec<FoundItem>> {
         let mut pendind_tasks = vec![];
         for fetcher in fetchers {
             pendind_tasks.push(tokio::spawn(async move {
-                if let Ok(data) = fetcher.fetch().await {
+                let future = fetcher.fetch();
+                if let Ok(data) = future.await {
                     Some(data)
                 } else {
                     println!("Couldn't fetch any data in {:?}", fetcher);

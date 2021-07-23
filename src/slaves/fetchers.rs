@@ -1,4 +1,7 @@
-use std::fmt::{Debug, Display};
+use std::{
+    any::Any,
+    fmt::{Debug, Display},
+};
 
 use anyhow::{anyhow, Result};
 use scraper::{ElementRef, Html, Selector};
@@ -80,8 +83,9 @@ pub struct FetcherConfig {
 type FetchResults = Vec<Option<FoundItem>>;
 
 #[async_trait]
-pub trait Fetchable: Debug {
+pub trait Fetchable: Debug + Send + 'static {
     async fn fetch(&self) -> Result<FetchResults>;
+    fn as_any(&self) -> &dyn Any;
 }
 
 #[derive(Debug, PartialOrd, PartialEq, Ord, Eq)]
@@ -134,6 +138,10 @@ impl Fetchable for SimpleFetcher {
             fetched.push(result)
         }
         Ok(fetched)
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 

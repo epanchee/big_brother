@@ -9,7 +9,7 @@ use super::fetchers::{Fetchable, FetcherConfig, SimpleFetcher};
 
 pub fn parse_yaml(config_file: &str) -> Result<Box<dyn Fetchable>> {
     let content = fs::read_to_string(config_file).unwrap();
-    let config: FetcherConfig = serde_yaml::from_str(&content[..])?;
+    let config: FetcherConfig = serde_yaml::from_str(&content)?;
     Ok(Box::new(SimpleFetcher { config }))
 }
 
@@ -81,7 +81,7 @@ pub mod tests {
         SimpleFetcher { config }
     }
 
-    fn gen_config2() -> FetcherConfig {
+    fn gen_config2() -> SimpleFetcher {
         let item_x = FetchItem {
             name: "entity_x".to_string(),
             path: "body > div > p:nth-child(3) > a".to_string(),
@@ -101,17 +101,23 @@ pub mod tests {
             ..item_x.clone()
         };
 
-        FetcherConfig {
+        let config = FetcherConfig {
             items: vec![item_x, item_y, item_z],
             url: "http://another-example.com".to_string(),
-        }
+        };
+
+        SimpleFetcher { config }
     }
 
     #[test]
     fn test_parse_yaml() {
         let config = gen_config1();
-        let mut fetch_items = parse_yaml("configs/example.yaml").unwrap();
-        assert_eq!(config, fetch_items);
+        let mut fetch_items = parse_yaml("configs/example.yaml")
+            .unwrap()
+            .as_any()
+            .downcast_ref::<SimpleFetcher>()
+            .unwrap();
+        assert_eq!(config, *fetch_items);
     }
 
     #[test]
@@ -119,7 +125,10 @@ pub mod tests {
         let config1 = gen_config1();
         let config2 = gen_config2();
 
-        let mut configs = parse_config_dir("test/configs");
+        let mut configs: Vec<SimpleFetcher> = parse_config_dir("test/configs")
+            .iter()
+            .map(|config| *config.as_any().downcast_ref::<SimpleFetcher>().unwrap())
+            .collect();
 
         assert_eq!(vec![config2, config1], configs);
 
