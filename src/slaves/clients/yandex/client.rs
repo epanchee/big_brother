@@ -1,13 +1,18 @@
 use std::{io, sync::Arc, time::Duration};
 
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use reqwest::{header::*, Client, Url};
 use scraper::{Html, Selector};
 
-use crate::slaves::clients::custom_cookies::MyJar;
+use crate::slaves::{
+    clients::custom_cookies::MyJar,
+    fetchers::{FetchResults, Fetchable},
+};
 
 const SELECTOR_ERROR: &str = "Hardcoded selector parse error";
 
+#[derive(Debug)]
 pub struct YandexClient {
     url: Url,
     origin: String,
@@ -112,6 +117,17 @@ impl YandexClient {
             text
         };
         Ok(text)
+    }
+}
+
+#[async_trait]
+impl Fetchable for YandexClient {
+    async fn fetch(&self) -> Result<FetchResults> {
+        todo!()
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 

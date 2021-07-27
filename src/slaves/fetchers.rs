@@ -80,7 +80,7 @@ pub struct FetcherConfig {
     pub url: String,
 }
 
-type FetchResults = Vec<Option<FoundItem>>;
+pub type FetchResults = Vec<Option<FoundItem>>;
 
 #[async_trait]
 pub trait Fetchable: Debug + Send + 'static {
