@@ -1,7 +1,4 @@
-use std::{
-    fs::{self},
-    path::Path,
-};
+use std::{fs, path::Path};
 
 use anyhow::{anyhow, Context, Result};
 
@@ -112,8 +109,8 @@ pub mod tests {
     #[test]
     fn test_parse_yaml() {
         let config = gen_config1();
-        let mut fetch_items = parse_yaml("configs/example.yaml")
-            .unwrap()
+        let fetch_items = parse_yaml("configs/example.yaml").unwrap();
+        let fetch_items = fetch_items
             .as_any()
             .downcast_ref::<SimpleFetcher>()
             .unwrap();
@@ -125,12 +122,18 @@ pub mod tests {
         let config1 = gen_config1();
         let config2 = gen_config2();
 
-        let mut configs: Vec<SimpleFetcher> = parse_config_dir("test/configs")
+        let configs: Vec<SimpleFetcher> = parse_config_dir("test/configs")
             .iter()
-            .map(|config| *config.as_any().downcast_ref::<SimpleFetcher>().unwrap())
+            .map(|config| {
+                config
+                    .as_any()
+                    .downcast_ref::<SimpleFetcher>()
+                    .unwrap()
+                    .clone()
+            })
             .collect();
 
-        assert_eq!(vec![config2, config1], configs);
+        assert_eq!(vec![config1, config2], configs);
 
         // detailed test
         // configs[1].iter().zip(&config1).for_each(|(i1, i2)| assert_eq!(i1, i2));

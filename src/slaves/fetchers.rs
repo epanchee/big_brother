@@ -74,7 +74,7 @@ pub struct FoundItem {
     pub related: Vec<Option<FoundItem>>,
 }
 
-#[derive(Deserialize, Debug, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Deserialize, Clone, Debug, PartialEq, PartialOrd, Eq, Ord)]
 pub struct FetcherConfig {
     pub items: Vec<FetchItem>,
     pub url: String,
@@ -88,7 +88,7 @@ pub trait Fetchable: Debug + Send + 'static {
     fn as_any(&self) -> &dyn Any;
 }
 
-#[derive(Debug, PartialOrd, PartialEq, Ord, Eq)]
+#[derive(Debug, Clone, PartialOrd, PartialEq, Ord, Eq)]
 pub struct SimpleFetcher {
     pub config: FetcherConfig,
 }
