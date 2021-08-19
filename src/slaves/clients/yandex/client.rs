@@ -131,9 +131,9 @@ impl Fetchable for YandexClient {
     }
 }
 
-pub fn get_price(text: String) -> Result<String> {
+pub fn get_price(text: String, css_selector: &str) -> Result<String> {
     let tree = Html::parse_document(&text);
-    let price_selector = Selector::parse("._3kWlKUNlTg > span:nth-child(1) > span:nth-child(1)")
+    let price_selector = Selector::parse(css_selector)
         .map_err(|_| anyhow!(SELECTOR_ERROR))?;
     Ok(tree
         .select(&price_selector)
