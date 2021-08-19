@@ -35,7 +35,7 @@ pub struct FetchItem {
 }
 
 impl FetchItem {
-    fn seek(&self, data: ElementRef) -> FoundItemContent {
+    pub fn seek(&self, data: ElementRef) -> FoundItemContent {
         match self.item_type {
             Class => Arr(data
                 .value()
@@ -48,7 +48,7 @@ impl FetchItem {
         }
     }
 
-    fn select<'a>(&'a self, tree: &'a Html) -> Result<ElementRef> {
+    pub fn select<'a>(&'a self, tree: &'a Html) -> Result<ElementRef> {
         let selector =
             Selector::parse(&self.path).map_err(|x| anyhow!("Selector parsing errored {:?}", x))?;
         tree.select(&selector)

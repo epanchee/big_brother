@@ -2,12 +2,12 @@ use std::{io, sync::Arc, time::Duration};
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use reqwest::{header::*, Client, Url};
+use reqwest::{header::*, Client, Response, Url};
 use scraper::{Html, Selector};
 
 use crate::slaves::{
     clients::custom_cookies::MyJar,
-    fetchers::{FetchResults, Fetchable},
+    fetchers::{FetchItem, FetchResults, Fetchable, FetcherConfig, FoundItem},
 };
 
 const SELECTOR_ERROR: &str = "Hardcoded selector parse error";
@@ -18,6 +18,7 @@ pub struct YandexClient {
     origin: String,
     cookies_jar: Arc<MyJar>,
     pub client: Client,
+    pub config: FetcherConfig,
 }
 
 impl YandexClient {
@@ -47,6 +48,10 @@ impl YandexClient {
             origin: Self::get_origin(url),
             cookies_jar: cookies_jar.clone(),
             client: Self::build_client(cookies_jar),
+            config: FetcherConfig {
+                items: vec![],
+                url: "".to_string(),
+            },
         }
     }
 
@@ -64,12 +69,7 @@ impl YandexClient {
             .unwrap()
     }
 
-    async fn crack_captcha(&self, action: &str) -> Result<String> {
-        let mut action_path = self.origin.to_owned() + action;
-        println!("1st action: {}", action_path);
-
-        let resp = self.client.get(action_path).send().await?;
-
+    async fn get_captcha_image(&self, resp: Response) -> Result<String> {
         let tree = Html::parse_document(&resp.text().await?);
 
         let selector =
@@ -88,9 +88,17 @@ impl YandexClient {
             .attr("action")
             .ok_or_else(|| anyhow!("Action select error"))?;
 
-        action_path = self.origin.to_owned() + action;
+        let action_path = self.origin.to_owned() + action;
         println!("img: {}\n2nd action: {}", img_path, action_path);
+        Ok(action_path)
+    }
 
+    async fn crack_captcha(&self, action: &str) -> Result<String> {
+        let action_path = self.origin.to_owned() + action;
+        println!("1st action: {}", action_path);
+        let resp = self.client.get(action_path).send().await?;
+
+        let action_path = self.get_captcha_image(resp).await?;
         println!("Enter captcha:");
         let mut guess = String::new();
         io::stdin()
@@ -102,28 +110,64 @@ impl YandexClient {
         Ok(resp.text().await?)
     }
 
-    pub async fn fetch(&self) -> Result<String> {
+    pub async fn retrieve(&self) -> Result<Html> {
         let resp = self.client.get(self.url.clone()).send().await?;
-        let mut text = resp.text().await?;
-        let tree = Html::parse_document(&text);
+        let text = resp.text().await?;
         let captcha_form_selector =
             Selector::parse(".CheckboxCaptcha-Form").map_err(|_| anyhow!(SELECTOR_ERROR))?;
-        text = if let Some(selected) = tree.select(&captcha_form_selector).next() {
-            let action = selected.value().attr("action").unwrap();
-            let text = self.crack_captcha(action).await?;
+        let action = Html::parse_document(&text)
+            .select(&captcha_form_selector)
+            .next()
+            .map(|x| x.value().attr("action").unwrap().to_owned());
+        let result = if let Some(action) = action {
+            let text = self.crack_captcha(&action).await?;
             self.cookies_jar.store_cookies()?;
             text
         } else {
             text
         };
-        Ok(text)
+        Ok(Html::parse_document(&result))
+    }
+
+    fn process_single_item(item: &FetchItem, tree: &Html) -> Option<FoundItem> {
+        if let Ok(data) = item.select(&tree) {
+            Some(FoundItem {
+                fetch_item: item.clone(),
+                content: item.seek(data),
+                related: vec![],
+            })
+        } else {
+            None
+        }
     }
 }
 
 #[async_trait]
 impl Fetchable for YandexClient {
     async fn fetch(&self) -> Result<FetchResults> {
-        todo!()
+        let tree = self.retrieve().await?;
+        let mut fetched = vec![];
+        let primary_items: Vec<_> = self
+            .config
+            .items
+            .iter()
+            .filter(|&item| item.primary)
+            .collect();
+        for primary_item in primary_items {
+            let result =
+                if let Some(mut found_item) = Self::process_single_item(primary_item, &tree) {
+                    let mut related_items = vec![];
+                    for item in primary_item.related.iter() {
+                        related_items.push(Self::process_single_item(item, &tree))
+                    }
+                    found_item.related = related_items;
+                    Some(found_item)
+                } else {
+                    None
+                };
+            fetched.push(result)
+        }
+        Ok(fetched)
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -131,10 +175,8 @@ impl Fetchable for YandexClient {
     }
 }
 
-pub fn get_price(text: String, css_selector: &str) -> Result<String> {
-    let tree = Html::parse_document(&text);
-    let price_selector = Selector::parse(css_selector)
-        .map_err(|_| anyhow!(SELECTOR_ERROR))?;
+pub fn get_price(tree: Html, css_selector: &str) -> Result<String> {
+    let price_selector = Selector::parse(css_selector).map_err(|_| anyhow!(SELECTOR_ERROR))?;
     Ok(tree
         .select(&price_selector)
         .next()
