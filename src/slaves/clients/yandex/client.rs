@@ -14,7 +14,6 @@ const SELECTOR_ERROR: &str = "Hardcoded selector parse error";
 
 #[derive(Debug)]
 pub struct YandexClient {
-    url: Url,
     origin: String,
     cookies_jar: Arc<MyJar>,
     pub client: Client,
@@ -40,18 +39,14 @@ impl YandexClient {
         headers
     }
 
-    pub fn new(url: &str) -> Self {
-        let url: Url = url.parse().unwrap();
+    pub fn new(config: FetcherConfig) -> Self {
+        let url: Url = config.url.parse().unwrap();
         let cookies_jar = Arc::new(MyJar::new(url.host().unwrap().to_string()));
         YandexClient {
-            url: url.clone(),
             origin: Self::get_origin(url),
             cookies_jar: cookies_jar.clone(),
             client: Self::build_client(cookies_jar),
-            config: FetcherConfig {
-                items: vec![],
-                url: "".to_string(),
-            },
+            config,
         }
     }
 
@@ -111,7 +106,7 @@ impl YandexClient {
     }
 
     pub async fn retrieve(&self) -> Result<Html> {
-        let resp = self.client.get(self.url.clone()).send().await?;
+        let resp = self.client.get(self.config.url.clone()).send().await?;
         let text = resp.text().await?;
         let captcha_form_selector =
             Selector::parse(".CheckboxCaptcha-Form").map_err(|_| anyhow!(SELECTOR_ERROR))?;
