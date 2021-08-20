@@ -169,12 +169,3 @@ impl Fetchable for YandexClient {
         self
     }
 }
-
-pub fn get_price(tree: Html, css_selector: &str) -> Result<String> {
-    let price_selector = Selector::parse(css_selector).map_err(|_| anyhow!(SELECTOR_ERROR))?;
-    Ok(tree
-        .select(&price_selector)
-        .next()
-        .ok_or_else(|| anyhow!("Price select error"))?
-        .inner_html())
-}

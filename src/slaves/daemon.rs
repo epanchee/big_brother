@@ -73,7 +73,8 @@ impl FetchDaemon {
 #[cfg(test)]
 mod tests {
     use crate::slaves::fetchers::{
-        FetchItem, FetchItemType, FetcherConfig, FoundItem, FoundItemContent::*, SimpleFetcher,
+        ClientType, FetchItem, FetchItemType, FetcherConfig, FoundItem, FoundItemContent::*,
+        SimpleFetcher,
     };
 
     use super::FetchDaemon;
@@ -99,6 +100,7 @@ mod tests {
         };
 
         let config = FetcherConfig {
+            client_type: ClientType::Simple,
             items: vec![item_x, item_y, item_z],
             url: "http://another-example.com".to_string(),
         };
@@ -129,6 +131,7 @@ mod tests {
         };
 
         let config1 = FetcherConfig {
+            client_type: ClientType::Simple,
             items: vec![item1.clone(), item2.clone(), item3.clone()],
             url: "http://example.com".to_string(),
         };
@@ -177,6 +180,7 @@ mod tests {
         };
 
         let config1 = FetcherConfig {
+            client_type: ClientType::Simple,
             items: vec![translations.clone(), banner.clone()],
             url: "https://www.lipsum.com/".to_string(),
         };
@@ -222,6 +226,7 @@ mod tests {
         };
 
         let config1 = FetcherConfig {
+            client_type: ClientType::Simple,
             items: vec![translations.clone(), item1.clone()],
             url: "https://www.lipsum.com/".to_string(),
         };

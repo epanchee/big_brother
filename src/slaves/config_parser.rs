@@ -2,12 +2,19 @@ use std::{fs, path::Path};
 
 use anyhow::{anyhow, Context, Result};
 
-use super::fetchers::{Fetchable, FetcherConfig, SimpleFetcher};
+use super::{
+    clients::yandex::client::YandexClient,
+    fetchers::{Fetchable, FetcherConfig, SimpleFetcher},
+};
 
 pub fn parse_yaml(config_file: &str) -> Result<Box<dyn Fetchable>> {
     let content = fs::read_to_string(config_file).unwrap();
     let config: FetcherConfig = serde_yaml::from_str(&content)?;
-    Ok(Box::new(SimpleFetcher { config }))
+    let fetcher: Box<dyn Fetchable> = match config.client_type {
+        super::fetchers::ClientType::Simple => Box::new(SimpleFetcher { config }),
+        super::fetchers::ClientType::Yandex => Box::new(YandexClient::new(config)),
+    };
+    Ok(fetcher)
 }
 
 pub fn parse_config_dir(dir_str: &str) -> Vec<Box<dyn Fetchable>> {
@@ -46,7 +53,7 @@ pub fn parse_config_dir(dir_str: &str) -> Vec<Box<dyn Fetchable>> {
 pub mod tests {
     use crate::slaves::{
         config_parser::{parse_config_dir, parse_yaml},
-        fetchers::{FetchItem, FetchItemType, FetcherConfig, SimpleFetcher},
+        fetchers::{ClientType, FetchItem, FetchItemType, FetcherConfig, SimpleFetcher},
     };
 
     fn gen_config1() -> SimpleFetcher {
@@ -71,6 +78,7 @@ pub mod tests {
         };
 
         let config = FetcherConfig {
+            client_type: ClientType::Simple,
             items: vec![item1, item2, item3],
             url: "http://example.com".to_string(),
         };
@@ -99,6 +107,7 @@ pub mod tests {
         };
 
         let config = FetcherConfig {
+            client_type: ClientType::Simple,
             items: vec![item_x, item_y, item_z],
             url: "http://another-example.com".to_string(),
         };

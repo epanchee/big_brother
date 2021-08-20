@@ -75,7 +75,21 @@ pub struct FoundItem {
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, PartialOrd, Eq, Ord)]
+pub enum ClientType {
+    Simple,
+    Yandex,
+}
+
+impl Default for ClientType {
+    fn default() -> Self {
+        Self::Simple
+    }
+}
+
+#[derive(Deserialize, Clone, Debug, PartialEq, PartialOrd, Eq, Ord)]
 pub struct FetcherConfig {
+    #[serde(default)]
+    pub client_type: ClientType,
     pub items: Vec<FetchItem>,
     pub url: String,
 }
@@ -158,7 +172,8 @@ mod tests {
     use scraper::{Html, Selector};
 
     use crate::slaves::fetchers::{
-        FetchItem, FetchItemType, Fetchable, FetcherConfig, FoundItemContent, SimpleFetcher,
+        ClientType, FetchItem, FetchItemType, Fetchable, FetcherConfig, FoundItemContent,
+        SimpleFetcher,
     };
 
     #[tokio::test]
@@ -198,6 +213,7 @@ mod tests {
 
         let fetcher = SimpleFetcher {
             config: FetcherConfig {
+                client_type: ClientType::Simple,
                 items: vec![item1],
                 url: "http://example.com/".to_string(),
             },
