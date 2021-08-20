@@ -6,10 +6,7 @@ use slaves::{
     clients::yandex::client::YandexClient, daemon::FetchDaemon, saver::Saver, saver::SaverType,
 };
 
-use crate::slaves::{
-    clients::yandex::client::get_price,
-    fetchers::{FetchItem, FetchItemType, FetcherConfig},
-};
+use crate::slaves::fetchers::{FetchItem, FetchItemType, Fetchable, FetcherConfig};
 
 #[tokio::main]
 async fn main() {
@@ -29,15 +26,8 @@ async fn main() {
 
     let client = YandexClient::new(config);
     loop {
-        let result = client.retrieve().await.unwrap();
-        println!(
-            "{}",
-            get_price(
-                result,
-                "div._3NaXx:nth-child(2) > span:nth-child(1) > span:nth-child(1)"
-            )
-            .unwrap()
-        );
+        let result = client.fetch().await.unwrap();
+        println!("{:?}", result);
         tokio::time::sleep(Duration::from_secs(10)).await;
     }
 }
