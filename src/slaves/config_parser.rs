@@ -7,24 +7,24 @@ use super::{
     fetchers::{Fetchable, FetcherConfig, SimpleFetcher},
 };
 
-pub fn parse_yaml(config_file: &str) -> Result<Box<dyn Fetchable>> {
+pub fn parse_yaml(config_file: &str) -> Result<Box<dyn Fetchable + Sync>> {
     let content = fs::read_to_string(config_file).unwrap();
     let config: FetcherConfig = serde_yaml::from_str(&content)?;
-    let fetcher: Box<dyn Fetchable> = match config.client_type {
+    let fetcher: Box<dyn Fetchable + Sync> = match config.client_type {
         super::fetchers::ClientType::Simple => Box::new(SimpleFetcher { config }),
         super::fetchers::ClientType::Yandex => Box::new(YandexClient::new(config)),
     };
     Ok(fetcher)
 }
 
-pub fn parse_config_dir(dir_str: &str) -> Vec<Box<dyn Fetchable>> {
+pub fn parse_config_dir(dir_str: &str) -> Vec<Box<dyn Fetchable + Sync>> {
     let dir = Path::new(dir_str);
-    let mut fetchers: Vec<Box<dyn Fetchable>> = vec![];
+    let mut fetchers: Vec<Box<dyn Fetchable + Sync>> = vec![];
     let files = fs::read_dir(dir).unwrap();
     for dir_entry in files {
         let result = dir_entry.map_err(From::from).and_then(|dir_entry| {
             let path = dir_entry.path();
-            let parse_file = || -> Result<Box<dyn Fetchable>> {
+            let parse_file = || -> Result<Box<dyn Fetchable + Sync>> {
                 let ext = path
                     .extension()
                     .ok_or_else(|| anyhow!("Path has no extension"))?;

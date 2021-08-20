@@ -7,10 +7,10 @@ use scraper::{Html, Selector};
 
 use crate::slaves::{
     clients::custom_cookies::MyJar,
-    fetchers::{FetchItem, FetchResults, Fetchable, FetcherConfig, FoundItem},
+    fetchers::{Fetchable, FetcherConfig},
 };
 
-const SELECTOR_ERROR: &str = "Hardcoded selector parse error";
+const SELECTOR_ERROR: &str = "Selector parse error";
 
 #[derive(Debug)]
 pub struct YandexClient {
@@ -43,15 +43,11 @@ impl YandexClient {
         let url: Url = config.url.parse().unwrap();
         let cookies_jar = Arc::new(MyJar::new(url.host().unwrap().to_string()));
         YandexClient {
-            origin: Self::get_origin(url),
+            origin: url.origin().unicode_serialization(),
             cookies_jar: cookies_jar.clone(),
             client: Self::build_client(cookies_jar),
             config,
         }
-    }
-
-    fn get_origin(url: Url) -> String {
-        url.origin().unicode_serialization()
     }
 
     fn build_client(cookies_jar: Arc<MyJar>) -> Client {
@@ -104,8 +100,15 @@ impl YandexClient {
         let resp = self.client.post(action_path).form(&params).send().await?;
         Ok(resp.text().await?)
     }
+}
 
-    pub async fn retrieve(&self) -> Result<Html> {
+#[async_trait]
+impl Fetchable for YandexClient {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    async fn retrieve(&self) -> Result<Html> {
         let resp = self.client.get(self.config.url.clone()).send().await?;
         let text = resp.text().await?;
         let captcha_form_selector =
@@ -124,48 +127,7 @@ impl YandexClient {
         Ok(Html::parse_document(&result))
     }
 
-    fn process_single_item(item: &FetchItem, tree: &Html) -> Option<FoundItem> {
-        if let Ok(data) = item.select(&tree) {
-            Some(FoundItem {
-                fetch_item: item.clone(),
-                content: item.seek(data),
-                related: vec![],
-            })
-        } else {
-            None
-        }
-    }
-}
-
-#[async_trait]
-impl Fetchable for YandexClient {
-    async fn fetch(&self) -> Result<FetchResults> {
-        let tree = self.retrieve().await?;
-        let mut fetched = vec![];
-        let primary_items: Vec<_> = self
-            .config
-            .items
-            .iter()
-            .filter(|&item| item.primary)
-            .collect();
-        for primary_item in primary_items {
-            let result =
-                if let Some(mut found_item) = Self::process_single_item(primary_item, &tree) {
-                    let mut related_items = vec![];
-                    for item in primary_item.related.iter() {
-                        related_items.push(Self::process_single_item(item, &tree))
-                    }
-                    found_item.related = related_items;
-                    Some(found_item)
-                } else {
-                    None
-                };
-            fetched.push(result)
-        }
-        Ok(fetched)
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
+    fn config(&self) -> &FetcherConfig {
+        &self.config
     }
 }

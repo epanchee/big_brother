@@ -29,7 +29,7 @@ impl FetchDaemon {
         }
     }
 
-    async fn fetch_data(fetchers: Vec<Box<impl Fetchable + ?Sized>>) -> Vec<Vec<FoundItem>> {
+    async fn fetch_data(fetchers: Vec<Box<impl Fetchable + ?Sized + Sync>>) -> Vec<Vec<FoundItem>> {
         let mut pendind_tasks = vec![];
         for fetcher in fetchers {
             pendind_tasks.push(tokio::spawn(async move {

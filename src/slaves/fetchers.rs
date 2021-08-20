@@ -98,22 +98,33 @@ pub type FetchResults = Vec<Option<FoundItem>>;
 
 #[async_trait]
 pub trait Fetchable: Debug + Send + 'static {
-    async fn fetch(&self) -> Result<FetchResults>;
+    async fn retrieve(&self) -> Result<Html>;
     fn as_any(&self) -> &dyn Any;
-}
+    fn config(&self) -> &FetcherConfig;
 
-#[derive(Debug, Clone, PartialOrd, PartialEq, Ord, Eq)]
-pub struct SimpleFetcher {
-    pub config: FetcherConfig,
-}
-
-impl SimpleFetcher {
-    async fn get_from_remote(&self) -> Result<Html> {
-        let resp_text = reqwest::get(&self.config.url).await?.text().await?;
-        Ok(Html::parse_document(&resp_text[..]))
+    async fn fetch(&self) -> Result<FetchResults> {
+        let tree = self.retrieve().await?;
+        let mut fetched = vec![];
+        let config = self.config();
+        let primary_items: Vec<_> = config.items.iter().filter(|&item| item.primary).collect();
+        for primary_item in primary_items {
+            let result = if let Some(mut found_item) = self.process_single_item(primary_item, &tree)
+            {
+                let mut related_items = vec![];
+                for item in primary_item.related.iter() {
+                    related_items.push(self.process_single_item(item, &tree))
+                }
+                found_item.related = related_items;
+                Some(found_item)
+            } else {
+                None
+            };
+            fetched.push(result)
+        }
+        Ok(fetched)
     }
 
-    fn process_single_item(item: &FetchItem, tree: &Html) -> Option<FoundItem> {
+    fn process_single_item(&self, item: &FetchItem, tree: &Html) -> Option<FoundItem> {
         if let Ok(data) = item.select(&tree) {
             Some(FoundItem {
                 fetch_item: item.clone(),
@@ -126,36 +137,24 @@ impl SimpleFetcher {
     }
 }
 
+#[derive(Debug, Clone, PartialOrd, PartialEq, Ord, Eq)]
+pub struct SimpleFetcher {
+    pub config: FetcherConfig,
+}
+
 #[async_trait]
 impl Fetchable for SimpleFetcher {
-    async fn fetch(&self) -> Result<FetchResults> {
-        let tree = self.get_from_remote().await?;
-        let mut fetched = vec![];
-        let primary_items: Vec<_> = self
-            .config
-            .items
-            .iter()
-            .filter(|&item| item.primary)
-            .collect();
-        for primary_item in primary_items {
-            let result =
-                if let Some(mut found_item) = Self::process_single_item(primary_item, &tree) {
-                    let mut related_items = vec![];
-                    for item in primary_item.related.iter() {
-                        related_items.push(Self::process_single_item(item, &tree))
-                    }
-                    found_item.related = related_items;
-                    Some(found_item)
-                } else {
-                    None
-                };
-            fetched.push(result)
-        }
-        Ok(fetched)
-    }
-
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    async fn retrieve(&self) -> Result<Html> {
+        let resp_text = reqwest::get(&self.config.url).await?.text().await?;
+        Ok(Html::parse_document(&resp_text[..]))
+    }
+
+    fn config(&self) -> &FetcherConfig {
+        &self.config
     }
 }
 
