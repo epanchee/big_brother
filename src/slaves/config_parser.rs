@@ -52,9 +52,8 @@ pub fn parse_config_dir(dir_str: &str) -> Vec<Box<dyn Fetchable + Sync>> {
 #[cfg(test)]
 pub mod tests {
     use crate::slaves::{
-        clients::yandex::client::YandexClient,
         config_parser::{parse_config_dir, parse_yaml},
-        fetchers::{ClientType, FetchItem, FetchItemType, Fetchable, FetcherConfig, SimpleFetcher},
+        fetchers::{ClientType, FetchItem, FetchItemType, FetcherConfig, SimpleFetcher},
     };
 
     fn gen_config1() -> SimpleFetcher {
