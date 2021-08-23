@@ -80,13 +80,12 @@ impl YandexClient {
             .ok_or_else(|| anyhow!("Action select error"))?;
 
         let action_path = self.origin.to_owned() + action;
-        println!("img: {}\n2nd action: {}", img_path, action_path);
+        println!("img: {}", img_path);
         Ok(action_path)
     }
 
     async fn crack_captcha(&self, action: &str) -> Result<String> {
         let action_path = self.origin.to_owned() + action;
-        println!("1st action: {}", action_path);
         let resp = self.client.get(action_path).send().await?;
 
         let action_path = self.get_captcha_image(resp).await?;
