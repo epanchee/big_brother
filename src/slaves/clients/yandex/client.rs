@@ -1,18 +1,23 @@
 use std::{io, sync::Arc, time::Duration};
 
 use anyhow::{anyhow, Result};
-use reqwest::{header::*, Client, Url};
+use async_trait::async_trait;
+use reqwest::{header::*, Client, Response, Url};
 use scraper::{Html, Selector};
 
-use crate::slaves::clients::custom_cookies::MyJar;
+use crate::slaves::{
+    clients::custom_cookies::MyJar,
+    fetchers::{Fetchable, FetcherConfig},
+};
 
-const SELECTOR_ERROR: &str = "Hardcoded selector parse error";
+const SELECTOR_ERROR: &str = "Selector parse error";
 
+#[derive(Debug)]
 pub struct YandexClient {
-    url: Url,
     origin: String,
     cookies_jar: Arc<MyJar>,
     pub client: Client,
+    pub config: FetcherConfig,
 }
 
 impl YandexClient {
@@ -34,19 +39,15 @@ impl YandexClient {
         headers
     }
 
-    pub fn new(url: &str) -> Self {
-        let url: Url = url.parse().unwrap();
+    pub fn new(config: FetcherConfig) -> Self {
+        let url: Url = config.url.parse().unwrap();
         let cookies_jar = Arc::new(MyJar::new(url.host().unwrap().to_string()));
         YandexClient {
-            url: url.clone(),
-            origin: Self::get_origin(url),
+            origin: url.origin().unicode_serialization(),
             cookies_jar: cookies_jar.clone(),
             client: Self::build_client(cookies_jar),
+            config,
         }
-    }
-
-    fn get_origin(url: Url) -> String {
-        url.origin().unicode_serialization()
     }
 
     fn build_client(cookies_jar: Arc<MyJar>) -> Client {
@@ -59,12 +60,7 @@ impl YandexClient {
             .unwrap()
     }
 
-    async fn crack_captcha(&self, action: &str) -> Result<String> {
-        let mut action_path = self.origin.to_owned() + action;
-        println!("1st action: {}", action_path);
-
-        let resp = self.client.get(action_path).send().await?;
-
+    async fn get_captcha_image(&self, resp: Response) -> Result<String> {
         let tree = Html::parse_document(&resp.text().await?);
 
         let selector =
@@ -83,9 +79,17 @@ impl YandexClient {
             .attr("action")
             .ok_or_else(|| anyhow!("Action select error"))?;
 
-        action_path = self.origin.to_owned() + action;
+        let action_path = self.origin.to_owned() + action;
         println!("img: {}\n2nd action: {}", img_path, action_path);
+        Ok(action_path)
+    }
 
+    async fn crack_captcha(&self, action: &str) -> Result<String> {
+        let action_path = self.origin.to_owned() + action;
+        println!("1st action: {}", action_path);
+        let resp = self.client.get(action_path).send().await?;
+
+        let action_path = self.get_captcha_image(resp).await?;
         println!("Enter captcha:");
         let mut guess = String::new();
         io::stdin()
@@ -96,32 +100,54 @@ impl YandexClient {
         let resp = self.client.post(action_path).form(&params).send().await?;
         Ok(resp.text().await?)
     }
+}
 
-    pub async fn fetch(&self) -> Result<String> {
-        let resp = self.client.get(self.url.clone()).send().await?;
-        let mut text = resp.text().await?;
-        let tree = Html::parse_document(&text);
+#[async_trait]
+impl Fetchable for YandexClient {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    async fn retrieve(&self) -> Result<Html> {
+        let resp = self.client.get(self.config.url.clone()).send().await?;
+        let text = resp.text().await?;
         let captcha_form_selector =
             Selector::parse(".CheckboxCaptcha-Form").map_err(|_| anyhow!(SELECTOR_ERROR))?;
-        text = if let Some(selected) = tree.select(&captcha_form_selector).next() {
-            let action = selected.value().attr("action").unwrap();
-            let text = self.crack_captcha(action).await?;
+        let action = Html::parse_document(&text)
+            .select(&captcha_form_selector)
+            .next()
+            .map(|x| x.value().attr("action").unwrap().to_owned());
+        let result = if let Some(action) = action {
+            let text = self.crack_captcha(&action).await?;
             self.cookies_jar.store_cookies()?;
             text
         } else {
             text
         };
-        Ok(text)
+        Ok(Html::parse_document(&result))
+    }
+
+    fn config(&self) -> &FetcherConfig {
+        &self.config
     }
 }
 
-pub fn get_price(text: String) -> Result<String> {
-    let tree = Html::parse_document(&text);
-    let price_selector = Selector::parse("._3kWlKUNlTg > span:nth-child(1) > span:nth-child(1)")
-        .map_err(|_| anyhow!(SELECTOR_ERROR))?;
-    Ok(tree
-        .select(&price_selector)
-        .next()
-        .ok_or_else(|| anyhow!("Price select error"))?
-        .inner_html())
+#[cfg(test)]
+pub mod tests {
+    use crate::slaves::config_parser::parse_yaml;
+
+    use super::YandexClient;
+
+    #[tokio::test]
+    async fn test_yaclient_works() {
+        let client = parse_yaml("test/configs/example3.yaml");
+        if let Ok(client) = client {
+            client
+                .as_any()
+                .downcast_ref::<YandexClient>()
+                .unwrap_or_else(|| panic!("Failed to create ya client from valid config!"));
+        } else {
+            panic!("Error with config parsing for ya client!")
+        }
+    }
 }

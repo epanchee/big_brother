@@ -1,0 +1,9 @@
+client_type: Yandex
+url: "https://example.com/"
+items:
+  - 
+    name: test
+    path: "body"
+    primary: true
+    item_type: Text
+    related: []

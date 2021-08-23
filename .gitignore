@@ -1,3 +1,4 @@
 /target
 .vscode/launch.json
-/config/tg.yaml
+cookies
+config/tg.yaml

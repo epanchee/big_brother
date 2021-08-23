@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use super::{
     config_parser::parse_config_dir,
-    fetchers::{Fetcher, FoundItem},
+    fetchers::{Fetchable, FoundItem},
     saver::Saver,
 };
 
@@ -29,14 +29,15 @@ impl FetchDaemon {
         }
     }
 
-    async fn fetch_data(configs: Vec<Fetcher>) -> Vec<Vec<FoundItem>> {
+    async fn fetch_data(fetchers: Vec<Box<impl Fetchable + ?Sized + Sync>>) -> Vec<Vec<FoundItem>> {
         let mut pendind_tasks = vec![];
-        for config in configs {
+        for fetcher in fetchers {
             pendind_tasks.push(tokio::spawn(async move {
-                if let Ok(data) = config.fetch().await {
+                let future = fetcher.fetch();
+                if let Ok(data) = future.await {
                     Some(data)
                 } else {
-                    println!("Couldn't fetch any data in {}", config);
+                    println!("Couldn't fetch any data in {:?}", fetcher);
                     None
                 }
             }));
@@ -60,8 +61,8 @@ impl FetchDaemon {
 
     pub async fn start(self) {
         loop {
-            let configs = parse_config_dir(&self.conf_path[..]);
-            let fetched = Self::fetch_data(configs).await;
+            let fetchers = parse_config_dir(&self.conf_path[..]);
+            let fetched = Self::fetch_data(fetchers).await;
             self.saver.push(fetched).await;
             println!("Going to sleep for {} secs...", self.interval.as_secs());
             tokio::time::sleep(self.interval).await;
@@ -72,12 +73,13 @@ impl FetchDaemon {
 #[cfg(test)]
 mod tests {
     use crate::slaves::fetchers::{
-        FetchItem, FetchItemType, Fetcher, FoundItem, FoundItemContent::*,
+        ClientType, FetchItem, FetchItemType, FetcherConfig, FoundItem, FoundItemContent::*,
+        SimpleFetcher,
     };
 
     use super::FetchDaemon;
 
-    fn gen_config2() -> Fetcher {
+    fn gen_config2() -> Box<SimpleFetcher> {
         let item_x = FetchItem {
             name: "entity_x".to_string(),
             path: "body > div > p:nth-child(3) > a".to_string(),
@@ -97,10 +99,13 @@ mod tests {
             ..item_x.clone()
         };
 
-        Fetcher {
+        let config = FetcherConfig {
+            client_type: ClientType::Simple,
             items: vec![item_x, item_y, item_z],
             url: "http://another-example.com".to_string(),
-        }
+        };
+
+        Box::new(SimpleFetcher { config })
     }
 
     #[tokio::test]
@@ -125,14 +130,16 @@ mod tests {
             ..item1.clone()
         };
 
-        let config1 = Fetcher {
+        let config1 = FetcherConfig {
+            client_type: ClientType::Simple,
             items: vec![item1.clone(), item2.clone(), item3.clone()],
             url: "http://example.com".to_string(),
         };
+        let config1 = Box::new(SimpleFetcher { config: config1 });
         let config2 = gen_config2();
 
-        let configs = vec![config1, config2];
-        let mut fetched = FetchDaemon::fetch_data(configs).await;
+        let aims = vec![config1, config2];
+        let mut fetched = FetchDaemon::fetch_data(aims).await;
         fetched.sort();
 
         let mut correct = vec![FoundItem {
@@ -172,12 +179,14 @@ mod tests {
             ..translations.clone()
         };
 
-        let config1 = Fetcher {
+        let config1 = FetcherConfig {
+            client_type: ClientType::Simple,
             items: vec![translations.clone(), banner.clone()],
             url: "https://www.lipsum.com/".to_string(),
         };
 
-        let mut fetched = FetchDaemon::fetch_data(vec![config1]).await;
+        let mut fetched =
+            FetchDaemon::fetch_data(vec![Box::new(SimpleFetcher { config: config1 })]).await;
         fetched.sort();
 
         let correct = vec![
@@ -216,12 +225,14 @@ mod tests {
             related: vec![translations.clone()],
         };
 
-        let config1 = Fetcher {
+        let config1 = FetcherConfig {
+            client_type: ClientType::Simple,
             items: vec![translations.clone(), item1.clone()],
             url: "https://www.lipsum.com/".to_string(),
         };
 
-        let mut fetched = FetchDaemon::fetch_data(vec![config1]).await;
+        let mut fetched =
+            FetchDaemon::fetch_data(vec![Box::new(SimpleFetcher { config: config1 })]).await;
         fetched.sort();
 
         let correct = vec![FoundItem {
