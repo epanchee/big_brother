@@ -100,6 +100,25 @@ impl YandexClient {
         let resp = self.client.post(action_path).form(&params).send().await?;
         Ok(resp.text().await?)
     }
+
+    async fn captcha_loop(&self, text: String) -> Result<String> {
+        let mut result: String = text.clone();
+        let captcha_form_selector =
+            Selector::parse(".CheckboxCaptcha-Form").map_err(|_| anyhow!(SELECTOR_ERROR))?;
+
+        loop {
+            let action = Html::parse_document(&text)
+                .select(&captcha_form_selector)
+                .next()
+                .and_then(|x| x.value().attr("action").unwrap().to_owned().into());
+            if let Some(action) = action {
+                result = self.crack_captcha(&action).await?;
+                self.cookies_jar.store_cookies()?;
+            } else {
+                return Ok(result);
+            }
+        }
+    }
 }
 
 #[async_trait]
@@ -111,19 +130,7 @@ impl Fetchable for YandexClient {
     async fn retrieve(&self) -> Result<Html> {
         let resp = self.client.get(self.config.url.clone()).send().await?;
         let text = resp.text().await?;
-        let captcha_form_selector =
-            Selector::parse(".CheckboxCaptcha-Form").map_err(|_| anyhow!(SELECTOR_ERROR))?;
-        let action = Html::parse_document(&text)
-            .select(&captcha_form_selector)
-            .next()
-            .map(|x| x.value().attr("action").unwrap().to_owned());
-        let result = if let Some(action) = action {
-            let text = self.crack_captcha(&action).await?;
-            self.cookies_jar.store_cookies()?;
-            text
-        } else {
-            text
-        };
+        let result = self.captcha_loop(text).await?;
         Ok(Html::parse_document(&result))
     }
 
