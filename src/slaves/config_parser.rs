@@ -43,7 +43,7 @@ pub fn parse_config_dir(dir_str: &str) -> Vec<Box<dyn Fetchable + Sync>> {
         if let Ok(config) = result {
             fetchers.push(config);
         } else {
-            println!("{:?}", result);
+            eprintln!("{:?}", result);
         }
     }
     fetchers
