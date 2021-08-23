@@ -131,3 +131,23 @@ impl Fetchable for YandexClient {
         &self.config
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use crate::slaves::config_parser::parse_yaml;
+
+    use super::YandexClient;
+
+    #[tokio::test]
+    async fn test_yaclient_works() {
+        let client = parse_yaml("test/configs/example3.yaml");
+        if let Ok(client) = client {
+            client
+                .as_any()
+                .downcast_ref::<YandexClient>()
+                .unwrap_or_else(|| panic!("Failed to create ya client from valid config!"));
+        } else {
+            panic!("Error with config parsing for ya client!")
+        }
+    }
+}

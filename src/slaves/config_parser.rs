@@ -52,8 +52,9 @@ pub fn parse_config_dir(dir_str: &str) -> Vec<Box<dyn Fetchable + Sync>> {
 #[cfg(test)]
 pub mod tests {
     use crate::slaves::{
+        clients::yandex::client::YandexClient,
         config_parser::{parse_config_dir, parse_yaml},
-        fetchers::{ClientType, FetchItem, FetchItemType, FetcherConfig, SimpleFetcher},
+        fetchers::{ClientType, FetchItem, FetchItemType, Fetchable, FetcherConfig, SimpleFetcher},
     };
 
     fn gen_config1() -> SimpleFetcher {
@@ -133,13 +134,8 @@ pub mod tests {
 
         let configs: Vec<SimpleFetcher> = parse_config_dir("test/configs")
             .iter()
-            .map(|config| {
-                config
-                    .as_any()
-                    .downcast_ref::<SimpleFetcher>()
-                    .unwrap()
-                    .clone()
-            })
+            .filter_map(|config| config.as_any().downcast_ref::<SimpleFetcher>())
+            .cloned()
             .collect();
 
         assert_eq!(vec![config1, config2], configs);
