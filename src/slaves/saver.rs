@@ -51,7 +51,7 @@ impl Saver {
         match stype {
             Telegram => TgNotifier::new().map_or_else(
                 |err| {
-                    println!("{}", err);
+                    eprintln!("{}", err);
                     SaverBackend::Nothing
                 },
                 SaverBackend::Notifier,
@@ -98,10 +98,10 @@ impl Saver {
                 if let SaverBackend::Notifier(notifier) = &self.backend {
                     let res = notifier.send(Signal::Msg(ser_data)).await;
                     if res.is_err() {
-                        println!("{:?}", res)
+                        eprintln!("{:?}", res)
                     }
                 } else {
-                    println!("Telegram notifier wasn't initialized. Can not send message")
+                    eprintln!("Telegram notifier wasn't initialized. Can not send message")
                 }
             }
             Postgres => unimplemented!(),
