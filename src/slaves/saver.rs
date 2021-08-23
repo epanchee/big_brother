@@ -7,6 +7,7 @@ use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
 
 use super::{
+    collector::PgCollector,
     fetchers::FoundItem,
     serializer::SerType::{self, *},
 };
@@ -27,6 +28,7 @@ use SaverType::*;
 #[derive(Clone, Debug)]
 enum SaverBackend {
     Notifier(TgNotifier),
+    Collector(PgCollector),
     Nothing,
 }
 
@@ -38,8 +40,8 @@ pub struct Saver {
 }
 
 impl Saver {
-    pub fn new(stype: SaverType, sertype: SerType) -> Self {
-        let backend = Self::setup(&stype);
+    pub async fn new(stype: SaverType, sertype: SerType) -> Self {
+        let backend = Self::setup(&stype).await;
         Saver {
             stype,
             sertype,
@@ -47,7 +49,7 @@ impl Saver {
         }
     }
 
-    fn setup(stype: &SaverType) -> SaverBackend {
+    async fn setup(stype: &SaverType) -> SaverBackend {
         match stype {
             Telegram => TgNotifier::new().map_or_else(
                 |err| {
@@ -56,21 +58,27 @@ impl Saver {
                 },
                 SaverBackend::Notifier,
             ),
-            Postgres => todo!(),
+            Postgres => PgCollector::new().await.map_or_else(
+                |err| {
+                    eprintln!("{}", err);
+                    SaverBackend::Nothing
+                },
+                SaverBackend::Collector,
+            ),
             _ => SaverBackend::Nothing,
         }
     }
 
-    pub fn new_default() -> Self {
-        Self::new(Stdout, Json)
+    pub async fn new_default() -> Self {
+        Self::new(Stdout, Json).await
     }
 
-    pub fn new_file_json(path: String) -> Self {
-        Self::new(File(path), Json)
+    pub async fn new_file_json(path: String) -> Self {
+        Self::new(File(path), Json).await
     }
 
-    pub fn new_saver_json(stype: SaverType) -> Self {
-        Self::new(stype, Json)
+    pub async fn new_saver_json(stype: SaverType) -> Self {
+        Self::new(stype, Json).await
     }
 
     #[async_recursion]
@@ -158,7 +166,7 @@ mod tests {
     #[tokio::test]
     async fn test_save_to_file() {
         let path = "test/test.out".to_string();
-        let saver = Saver::new(File(path.clone()), SerType::Json);
+        let saver = Saver::new(File(path.clone()), SerType::Json).await;
         let test_data = create_test_data();
 
         saver.push(test_data).await.unwrap();

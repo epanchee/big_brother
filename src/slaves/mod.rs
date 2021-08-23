@@ -5,3 +5,4 @@ pub mod serializer;
 pub mod saver;
 pub mod clients;
 pub mod notifier;
+pub mod collector;
