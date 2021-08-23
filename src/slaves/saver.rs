@@ -14,7 +14,7 @@ use super::{
 use anyhow::Result;
 use async_recursion::async_recursion;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum SaverType {
     Stdout,
     File(String),
@@ -25,14 +25,14 @@ pub enum SaverType {
 
 use SaverType::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 enum SaverBackend {
     Notifier(TgNotifier),
     Collector(PgCollector),
     Nothing,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Saver {
     stype: SaverType,
     sertype: SerType,
@@ -112,7 +112,16 @@ impl Saver {
                     eprintln!("Telegram notifier wasn't initialized. Can not send message")
                 }
             }
-            Postgres => unimplemented!(),
+            Postgres => {
+                if let SaverBackend::Collector(collector) = &self.backend {
+                    let res = collector.store(ser_data).await;
+                    if res.is_err() {
+                        eprintln!("{:?}", res)
+                    }
+                } else {
+                    eprintln!("Postgres collector wasn't initialized. Can not store data")
+                }
+            }
         }
         Ok(())
     }
