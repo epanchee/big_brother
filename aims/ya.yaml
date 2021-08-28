@@ -7,3 +7,9 @@ items:
     primary: true
     item_type: Text
     related: []
+  - 
+    name: pods2
+    path: "._3kWlK > span:nth-child(1) > span:nth-child(1)"
+    primary: true
+    item_type: Text
+    related: []
