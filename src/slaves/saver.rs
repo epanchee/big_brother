@@ -114,7 +114,7 @@ impl Saver {
             }
             Postgres => {
                 if let SaverBackend::Collector(collector) = &self.backend {
-                    let res = collector.store(ser_data).await;
+                    let res = collector.store(data).await;
                     if res.is_err() {
                         eprintln!("{:?}", res)
                     }

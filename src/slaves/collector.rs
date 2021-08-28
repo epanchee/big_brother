@@ -1,48 +1,35 @@
-use std::sync::Arc;
+use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 
-use tokio_postgres::{Client, Error, NoTls, Statement};
+use anyhow::{Error, Result};
+use sqlx::types::Json;
 
-use anyhow::Result;
+use super::fetchers::FoundItem;
 
 #[derive(Clone)]
 pub struct PgCollector {
-    client: Arc<Client>,
-    save_query: Statement,
+    pool: Pool<Postgres>,
 }
 
 impl PgCollector {
     pub async fn new() -> Result<Self, Error> {
-        let (client, connection) =
-            tokio_postgres::connect("host=localhost user=postgres password=password", NoTls)
-                .await?;
-        tokio::spawn(async move {
-            if let Err(e) = connection.await {
-                eprintln!("Database connection error: {}", e);
-            }
-        });
+        let pool = PgPoolOptions::new()
+            .max_connections(5)
+            .connect(&dotenv::var("DATABASE_URL")?)
+            .await?;
 
-        client
-            .query(
-                "CREATE TABLE history
-                    (
-                        id SERIAL PRIMARY KEY,
-                        data VARCHAR(1024)  NOT NULL,
-                        ts TIMESTAMP DEFAULT NOW()
-                    )",
-                &[],
-            )
-            .await;
-
-        Ok(PgCollector {
-            save_query: client
-                .prepare("INSERT INTO history (data) VALUES ($1)")
-                .await?,
-            client: Arc::new(client),
-        })
+        Ok(PgCollector { pool })
     }
 
-    pub async fn store(&self, data: String) -> Result<()> {
-        self.client.query(&self.save_query, &[&data]).await?;
+    pub async fn store(&self, data: Vec<Vec<FoundItem>>) -> Result<()> {
+        sqlx::query!(
+            r#"
+INSERT INTO history (data)
+VALUES ( $1 )
+            "#,
+            Json(data) as _
+        )
+        .execute(&self.pool)
+        .await?;
         Ok(())
     }
 }

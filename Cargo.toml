@@ -9,20 +9,22 @@ edition = "2018"
 [dependencies]
 openssl = { version = "0.10" }
 openssl-sys = { version = "0.9.65" }
-reqwest = { version = "0.11.4", features = ["json", "cookies", "default-tls"] }
+reqwest = { version = "0.11", features = ["json", "cookies", "default-tls"] }
 tokio = { version = "1", features = ["full"] }
-scraper = "0.12.0"
-selectors = "0.23.0"
-anyhow = "1.0.41"
-serde = { version = "1.0.126", features = ["derive"] }
-serde_json = "1.0.64"
-serde_yaml = "0.8.17"
-pretty_assertions = "0.7.2"
-async-recursion = "0.3.2"
-bytes = "1.0.1"
-cookie = "0.15.0"
-cookie_store = "0.15.0"
-futures = "0.3.15"
+scraper = "0.12"
+selectors = "0.23"
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.8"
+pretty_assertions = "0.7"
+async-recursion = "0.3"
+bytes = "1"
+cookie = "0.15"
+cookie_store = "0.15"
+futures = "0.3"
 rutebot = "0.7"
-async-trait = "0.1.50"
+async-trait = "0.1"
 tokio-postgres = "0.7"
+sqlx = { version = "0.5", features = [ "postgres", "runtime-tokio-native-tls" ] }
+dotenv = "0"
