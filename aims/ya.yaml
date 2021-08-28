@@ -3,7 +3,7 @@ url: "https://market.yandex.ru/product--besprovodnye-naushniki-apple-airpods-pro
 items:
   - 
     name: pods
-    path: "div._3NaXx:nth-child(2) > span:nth-child(1) > span:nth-child(1)"
+    path: "._3kWlK > span:nth-child(1) > span:nth-child(1)"
     primary: true
     item_type: Text
     related: []

@@ -3,15 +3,15 @@ use crate::slaves::{
     serializer::serialize_all,
 };
 
-use tokio::fs::OpenOptions;
-use tokio::io::AsyncWriteExt;
+use tokio::fs::{File, OpenOptions};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use super::{
     collector::PgCollector,
     fetchers::FoundItem,
     serializer::SerType::{self, *},
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
 
 #[derive(Clone)]
@@ -31,6 +31,8 @@ enum SaverBackend {
     Collector(PgCollector),
     Nothing,
 }
+
+pub type SavedResults = Vec<FoundItem>;
 
 #[derive(Clone)]
 pub struct Saver {
@@ -82,7 +84,7 @@ impl Saver {
     }
 
     #[async_recursion]
-    pub async fn push(&self, data: Vec<Vec<FoundItem>>) -> Result<()> {
+    pub async fn push(&self, data: Vec<SavedResults>) -> Result<()> {
         let mut ser_data = serialize_all(data.to_vec(), self.sertype);
         match self.stype.clone() {
             Stdout => println!("{}", ser_data),
@@ -124,6 +126,24 @@ impl Saver {
             }
         }
         Ok(())
+    }
+
+    #[async_recursion]
+    pub async fn get_lastn(&self, n: usize) -> Result<Vec<SavedResults>> {
+        let data = match self.stype.clone() {
+            File(path) => {
+                let mut f = File::open(path).await?;
+                let mut buffer = String::new();
+                f.read_to_string(&mut buffer).await?;
+                let data: Vec<SavedResults> = serde_json::from_str(&buffer)
+                    .map_err(|_| anyhow!("Failed to parse json to FoundItems"))?;
+                Some(data.as_slice()[..data.len() - n].to_vec())
+            }
+            Multiple(_) => todo!(),
+            Postgres => todo!(),
+            _ => None,
+        };
+        data.ok_or_else(|| anyhow!("Doesn't support get_last()"))
     }
 }
 

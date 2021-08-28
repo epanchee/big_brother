@@ -16,7 +16,7 @@ pub enum FetchItemType {
 }
 use FetchItemType::*;
 
-#[derive(Debug, Serialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, PartialOrd, Ord, Eq)]
 #[serde(untagged)]
 pub enum FoundItemContent {
     Str(String),
@@ -66,7 +66,7 @@ impl Serialize for FetchItem {
     }
 }
 
-#[derive(Clone, Debug, Serialize, PartialOrd, PartialEq, Ord, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, PartialEq, Ord, Eq)]
 pub struct FoundItem {
     #[serde(rename = "name")]
     pub fetch_item: FetchItem,
